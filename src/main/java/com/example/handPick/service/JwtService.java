@@ -21,7 +21,7 @@ public class JwtService {
 
     private static final String SECRET_KEY = "YS1zdHJpbmctc2VjcmV0LWF0LWxlYXN0LTI1Ni1iaXRzLWxvbmc=";
     // Token expiration time (e.g., 30 minutes)
-    private static final long EXPIRATION_MILLIS = 1000 * 60 * 30;
+    private static final long EXPIRATION_MILLIS = 1000 * 60 * 30 * 24;
 
     // Generates a token with just a subject (username). No extra claims.
     public String generateToken(String username) {
@@ -59,7 +59,7 @@ public class JwtService {
 
     // Parses and validates the token, returning all claims.
     private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
+        return Jwts.parser()
                 .setSigningKey(getSignKey())
                 .build()
                 .parseClaimsJws(token)

@@ -1,53 +1,93 @@
-package com.example.handPick.config;
+package com.example.handPick.config; // UPDATED
 
-import com.example.handPick.security.JwtAuthFilter;
+import com.example.handPick.service.CustomUserDetailsService; // UPDATED
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.accept.ContentNegotiationStrategy;
-import org.springframework.web.accept.HeaderContentNegotiationStrategy;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthFilter jwtAuthFilter;
+    @Autowired
+    private JwtAuthFilter jwtAuthFilter;
 
-    // Constructor injection for JwtAuthFilter
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
-        this.jwtAuthFilter = jwtAuthFilter;
-    }
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless REST APIs
-                .cors(cors -> {}) // Enable CORS (assumes CorsConfigurationSource is defined elsewhere, like AppConfig)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/orders/**").authenticated() // Example: secure specific endpoints
-                        .anyRequest().permitAll()) // Permit all other requests by default (adjust as needed)
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Use stateless sessions for JWT
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class) // Add custom JWT filter
-                .setSharedObject(ContentNegotiationStrategy.class, new HeaderContentNegotiationStrategy()); // Configure content negotiation
-
-        return http.build();
-    }
+    @Value("${allowed.origins}")
+    private String allowedOrigins;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Expose AuthenticationManager for potential manual username/password authentication flow
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
+        authenticationProvider.setUserDetailsService(userDetailsService);
+        authenticationProvider.setPasswordEncoder(passwordEncoder());
+        return authenticationProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // Split allowedOrigins string by comma to support multiple origins
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cookie"));
+        configuration.setAllowCredentials(true); // Crucial for sending/receiving cookies across origins
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie")); // Expose these headers to the client
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration); // Apply CORS to all paths
+        return source;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless API (JWT)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS with custom configuration
+                .authorizeHttpRequests(authorize -> authorize
+                        // Public endpoints: registration, login, refresh token, cart operations (guest & logged-in)
+                        // H2 console is also permitted for development purposes
+                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/cart/**", "/h2-console/**").permitAll()
+                        .anyRequest().authenticated() // All other requests require authentication
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Use stateless sessions for JWT
+                )
+                .authenticationProvider(authenticationProvider()) // Configure custom authentication provider
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class) // Add JWT filter before Spring Security's default filter
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin())); // Allow H2 console to be in an iframe
+
+        return http.build();
     }
 }
