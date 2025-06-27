@@ -1,6 +1,6 @@
-package com.example.handPick.config; // UPDATED
+package com.example.handPick.config;
 
-import com.example.handPick.service.CustomUserDetailsService; // UPDATED
+import com.example.handPick.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +25,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity // Enable @PreAuthorize and @PostAuthorize for method-level security
 public class SecurityConfig {
 
     @Autowired
@@ -76,10 +76,20 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless API (JWT)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS with custom configuration
                 .authorizeHttpRequests(authorize -> authorize
-                        // Public endpoints: registration, login, refresh token, cart operations (guest & logged-in)
-                        // H2 console is also permitted for development purposes
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/cart/**", "/h2-console/**").permitAll()
-                        .anyRequest().authenticated() // All other requests require authentication
+                        // Public endpoints:
+                        .requestMatchers(
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/logout",
+                                "/api/cart/**", // Cart operations are public for guests and authenticated users
+                                "/api/products", // GET /api/products should be public for product listing
+                                "/api/products/{id}", // GET /api/products/{id} should be public for single product view
+                                "/h2-console/**" // H2 console for development
+                        ).permitAll() // Permit all access to the above paths
+                        // All other requests require authentication.
+                        // POST, PUT, DELETE for /api/products are secured by @PreAuthorize on the controller methods themselves.
+                        .anyRequest().authenticated() // Any other request not explicitly permitted above requires authentication
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Use stateless sessions for JWT

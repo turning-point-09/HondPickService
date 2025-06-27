@@ -19,7 +19,7 @@ public class JwtService {
     // This is a base64 encoded 32-byte key (256 bits).
 //    private static final String SECRET_KEY = "YourSuperSecretKeyThatIsAtLeast32BytesLongAndSecurelyStored!1234567890"; // Replaced with a sample key
 
-    private static final String SECRET_KEY = "YS1zdHJpbmctc2VjcmV0LWF0LWxlYXN0LTI1Ni1iaXRzLWxvbmc=";
+    private static final String SECRET_KEY = "dS1DlPtWbEN8nLmDDKChi0o+kH44cIHd2PBX8Tdix7+egiSYyjyRzLQkmYxi07xZ2q2b02d4U8DRvFdNQolvUg==";
     // Token expiration time (e.g., 30 minutes)
     private static final long EXPIRATION_MILLIS = 1000 * 60 * 30 * 24;
 

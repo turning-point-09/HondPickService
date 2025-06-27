@@ -15,7 +15,8 @@ public class ProductDto {
     private double price;
     private String imageUrl; // For displaying product images in frontend
     private int stockQuantity; // To check if product is available
-
+//    private double discountPercentage;
+    //tetsthhhhmhmhmhmh
     // If not using Lombok, you'd manually add:
     // public ProductDto() {}
     // public ProductDto(Long id, String name, ...) { ... }
