@@ -16,4 +16,15 @@ public class CartItemDto {
     private int quantity;
     private BigDecimal unitPrice;
     private BigDecimal subtotal;
+    private String imageUrl; // Optional
+
 }
+
+//@Data
+//public class CartItemDto {
+//    private Long productId;
+//    private String productName;
+//    private BigDecimal price;
+//    private int quantity;
+//    private String imageUrl; // Optional
+//}

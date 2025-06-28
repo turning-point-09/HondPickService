@@ -2,10 +2,10 @@ package com.example.handPick.controller;
 
 import com.example.handPick.dto.ProductDto; // Import ProductDto
 import com.example.handPick.service.ProductService; // Import ProductService
-import org.springframework.beans.factory.annotation.Autowired; // For dependency injection
+import jakarta.validation.Valid; // For DTO validation
 import org.springframework.http.HttpStatus; // HTTP status codes
 import org.springframework.http.ResponseEntity; // Wrapper for HTTP response
-import org.springframework.security.access.prepost.PreAuthorize; // NEW IMPORT for security
+import org.springframework.security.access.prepost.PreAuthorize; // For security
 import org.springframework.web.bind.annotation.*; // REST annotations
 
 import java.util.List;
@@ -14,8 +14,13 @@ import java.util.List;
 @RequestMapping("/api/products") // Base path for all endpoints in this controller
 public class ProductController {
 
-    @Autowired // Injects the ProductService dependency
-    private ProductService productService;
+    // Using constructor injection is generally preferred over @Autowired on fields
+    private final ProductService productService;
+
+    // Constructor Injection
+    public ProductController(ProductService productService) {
+        this.productService = productService;
+    }
 
     /**
      * GET /api/products
@@ -30,20 +35,18 @@ public class ProductController {
 
     /**
      * GET /api/products/{id}
-     * Retrieves a single product by its ID. This endpoint is generally public.
+     * Retrieves a single product by its ID and maps it to ProductDto.
+     * This endpoint is generally public.
      * @param id The ID of the product to retrieve.
      * @return ResponseEntity containing the ProductDto and HTTP status OK if found,
      * or HTTP status NOT_FOUND if not found.
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDto> getProductById(@PathVariable Long id) {
-        try {
-            ProductDto product = productService.findProductById(id);
-            return ResponseEntity.ok(product); // Returns 200 OK with the product
-        } catch (RuntimeException e) {
-            // Catches the exception thrown by service if product not found
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // Returns 404 Not Found
-        }
+        // Using Optional from service for cleaner error handling
+        return productService.getProductById(id) // This method now returns Optional<ProductDto> from Service
+                .map(ResponseEntity::ok) // If present, return 200 OK
+                .orElse(ResponseEntity.notFound().build()); // If not present, return 404 Not Found
     }
 
     /**
@@ -55,11 +58,10 @@ public class ProductController {
      */
     @PreAuthorize("isAuthenticated()") // Ensure only authenticated users can create products
     @PostMapping // Handles POST requests to /api/products
-    public ResponseEntity<ProductDto> createProduct(@RequestBody ProductDto productDto) {
+    public ResponseEntity<ProductDto> createProduct(@Valid @RequestBody ProductDto productDto) { // Added @Valid
         // IMPORTANT: Ensure ID is null for new products so the database auto-generates it.
-        // This prevents clients from specifying an ID.
         productDto.setId(null);
-        ProductDto createdProduct = productService.saveProduct(productDto);
+        ProductDto createdProduct = productService.saveProduct(productDto); // Using the unified saveProduct
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct); // Returns 201 Created
     }
 
@@ -74,13 +76,16 @@ public class ProductController {
      */
     @PreAuthorize("isAuthenticated()") // Ensure only authenticated users can update products
     @PutMapping("/{id}")
-    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @RequestBody ProductDto productDto) {
+    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDto productDto) { // Added @Valid
         try {
-            // Ensure the ID from the path is set in the DTO for updates, overriding any ID sent in the body
-            productDto.setId(id);
-            ProductDto updatedProduct = productService.saveProduct(productDto);
+            // Fix: Set the ID on a separate line, then pass the modified DTO to the service.
+            productDto.setId(id); // Set the ID from the path to the DTO
+
+            ProductDto updatedProduct = productService.saveProduct(productDto); // Pass the DTO itself
+
             return ResponseEntity.ok(updatedProduct); // Returns 200 OK with the updated product
         } catch (RuntimeException e) {
+            // This catches "Product not found" from the service
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // Returns 404 Not Found
         }
     }

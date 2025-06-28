@@ -1,26 +1,29 @@
 package com.example.handPick.dto;
 
-// Lombok annotations for boilerplate code (optional, but highly recommended)
-import lombok.*;
+// Lombok annotations for boilerplate code
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.Setter; // Not strictly needed if @Data is used, but harmless.
+import lombok.Getter; // Not strictly needed if @Data is used, but harmless.
 
-@Getter
-@Setter
-@Data // Generates getters, setters, toString, equals, and hashCode
+@Getter // Redundant if @Data is used, but harmless.
+@Setter // Redundant if @Data is used, but harmless.
+@Data // Generates getters, setters, toString, equals, and hashCode. This is sufficient.
 @NoArgsConstructor // Generates a no-argument constructor
 @AllArgsConstructor // Generates a constructor with all fields
 public class ProductDto {
     private Long id;
     private String name;
     private String description;
-    private double price;
+    private Double price; // Changed to Double for consistency with nullable in entity/service
     private String imageUrl; // For displaying product images in frontend
     private int stockQuantity; // To check if product is available
-//    private double discountPercentage;
-    //tetsthhhhmhmhmhmh
-    // If not using Lombok, you'd manually add:
-    // public ProductDto() {}
-    // public ProductDto(Long id, String name, ...) { ... }
-    // public Long getId() { ... }
-    // public void setId(Long id) { ... }
-    // ... all other getters and setters
+
+    // --- NEW FIELDS TO ADD / UPDATE ---
+    private Double rating; // Add this field, use Double for nullable decimal
+    private Double oldPrice; // Add this field, use Double for nullable
+    private Double discountPercentage; // Ensure this is also Double for consistency and nullability
+
+    // No manual getters/setters/constructors needed due to Lombok annotations
 }
