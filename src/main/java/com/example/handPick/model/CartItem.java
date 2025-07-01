@@ -1,14 +1,14 @@
-package com.example.handPick.model; // UPDATED
+package com.example.handPick.model; // Corrected package name to handPick
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
-import java.math.BigDecimal;
+import java.math.BigDecimal; // Use BigDecimal for currency
 
 @Entity
-@Table(name = "cart_items")
+@Table(name = "cart_items") // Explicitly define table name
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,26 +19,25 @@ public class CartItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
-    private Cart cart;
+    private Cart cart; // Reference to the Cart entity
 
-    // Assuming a Product entity exists
-    private Long productId; // Store product ID directly if Product entity is not fully managed here
-    private String productName; // Denormalized for simplicity in cart view
-    private BigDecimal unitPrice; // Price at time of adding to cart
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product; // Reference to the Product entity
 
-    private int quantity;
+    @Column(nullable = false)
+    private BigDecimal price; // This stores the price of the product at the time it was added to the cart.
 
-    @Transient // Not persisted in DB, calculated on the fly
-    private BigDecimal subtotal;
+    @Column(nullable = false)
+    private Integer quantity; // Use Integer for quantity
 
-    @PostLoad
-    @PostPersist
-    @PostUpdate
-    public void calculateSubtotal() {
-        if (unitPrice != null) {
-            this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
-        } else {
-            this.subtotal = BigDecimal.ZERO;
-        }
+    // Constructor for adding new item to cart
+    // This constructor is used by CartService when creating a new CartItem
+    public CartItem(Product product, Integer quantity, Cart cart) {
+        this.product = product;
+        this.quantity = quantity;
+        // FIX: Directly assign BigDecimal price from Product entity
+        this.price = product.getPrice(); // Capture current product price from the Product entity
+        this.cart = cart;
     }
 }

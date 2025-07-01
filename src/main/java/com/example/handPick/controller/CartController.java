@@ -3,23 +3,26 @@ package com.example.handPick.controller;
 import com.example.handPick.config.JwtUtil;
 import com.example.handPick.dto.AddToCartRequest;
 import com.example.handPick.dto.CartDto;
-import com.example.handPick.dto.CheckoutResponse; // NEW IMPORT
-import com.example.handPick.model.Order; // NEW IMPORT
+import com.example.handPick.dto.CheckoutResponse;
+import com.example.handPick.dto.QuantityUpdateRequest;
+import com.example.handPick.model.Order;
 import com.example.handPick.model.User;
 import com.example.handPick.service.CartService;
 import com.example.handPick.service.UserService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize; // NEW IMPORT for @PreAuthorize
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.Cookie;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,173 +30,225 @@ import java.util.UUID;
 @RequestMapping("/api/cart")
 public class CartController {
 
-    @Autowired
-    private CartService cartService;
+    private final CartService cartService;
+    private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     @Autowired
-    private UserService userService;
+    public CartController(CartService cartService,
+                          UserService userService,
+                          JwtUtil jwtUtil) {
+        this.cartService = cartService;
+        this.userService = userService;
+        this.jwtUtil = jwtUtil;
+    }
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private UUID getValidGuestIdFromCookie(HttpServletRequest req, HttpServletResponse res) {
+        return Arrays.stream(Optional.ofNullable(req.getCookies()).orElse(new Cookie[0]))
+                .filter(c -> "guest_token".equals(c.getName()))
+                .findFirst()
+                .map(Cookie::getValue)
+                .flatMap(token -> {
+                    if (jwtUtil.validateGuestToken(token)) {
+                        return Optional.ofNullable(jwtUtil.extractGuestId(token));
+                    } else {
+                        Cookie expired = new Cookie("guest_token", "");
+                        expired.setPath("/");
+                        expired.setHttpOnly(true);
+                        expired.setMaxAge(0);
+                        res.addCookie(expired);
+                        return Optional.empty();
+                    }
+                })
+                .orElse(null);
+    }
 
-    // ... (existing getCart and addItemToCart methods) ...
-
-    /**
-     * Endpoint to get the current user's or guest's cart.
-     * If user is logged in, their cart is returned.
-     * If not logged in, tries to retrieve cart based on guest_token cookie.
-     * If no guest_token, a new one is generated and set.
-     * @param userDetails Authenticated user details (if available from access token).
-     * @param httpRequest HttpServletRequest to read guest_token cookie.
-     * @param httpResponse HttpServletResponse to set new guest_token cookie if needed.
-     * @return ResponseEntity with CartDto.
-     */
     @GetMapping
     public ResponseEntity<CartDto> getCart(
             @AuthenticationPrincipal UserDetails userDetails,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
+            HttpServletRequest req,
+            HttpServletResponse res) {
 
-        User currentUser = null;
-        // If userDetails is present, it means a valid access token was provided in the Authorization header.
-        if (userDetails != null) {
-            currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
-        }
+        User currentUser = Optional.ofNullable(userDetails)
+                .flatMap(u -> userService.findByUsername(u.getUsername()))
+                .orElse(null);
 
-        UUID guestId = null;
-        // Always try to get guest ID from cookie, regardless of login status.
-        // This is crucial for initial guest experience and potential cart merging on login.
-        Optional<Cookie> guestCookie = Arrays.stream(Optional.ofNullable(httpRequest.getCookies()).orElse(new Cookie[0]))
-                .filter(cookie -> "guest_token".equals(cookie.getName()))
-                .findFirst();
-
-        if (guestCookie.isPresent()) {
-            String guestJwt = guestCookie.get().getValue();
-            try {
-                guestId = jwtUtil.extractGuestId(guestJwt);
-                // Invalidate guestId if the guest token is expired or invalid
-                if (!jwtUtil.validateGuestToken(guestJwt)) {
-                    guestId = null;
-                    // Clear the expired guest cookie
-                    Cookie expiredGuestCookie = new Cookie("guest_token", "");
-                    expiredGuestCookie.setPath("/");
-                    expiredGuestCookie.setHttpOnly(true);
-                    expiredGuestCookie.setMaxAge(0);
-                    httpResponse.addCookie(expiredGuestCookie);
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to extract guest ID from cookie: " + e.getMessage());
-                guestId = null;
-            }
-        }
-
-        // If no logged-in user and no valid guest ID, create a new guest ID and token.
+        UUID guestId = getValidGuestIdFromCookie(req, res);
         if (currentUser == null && guestId == null) {
             guestId = UUID.randomUUID();
-            String newGuestToken = jwtUtil.generateGuestToken(guestId);
-
-            Cookie newGuestCookie = new Cookie("guest_token", newGuestToken);
-            newGuestCookie.setHttpOnly(true);
-            newGuestCookie.setPath("/");
-            newGuestCookie.setMaxAge((int) (jwtUtil.getGuestExpiration() / 1000)); // Max age in seconds
-            httpResponse.addCookie(newGuestCookie);
+            String token = jwtUtil.generateGuestToken(guestId);
+            Cookie cookie = new Cookie("guest_token", token);
+            cookie.setHttpOnly(true);
+            cookie.setPath("/");
+            cookie.setMaxAge((int) (jwtUtil.getGuestExpiration() / 1000));
+            res.addCookie(cookie);
         }
 
-        // Retrieve or create the cart based on user or guest ID
         CartDto cart = cartService.getCart(currentUser, guestId);
         return ResponseEntity.ok(cart);
     }
 
-    /**
-     * Endpoint to add items to the cart.
-     * Supports both authenticated users and anonymous guests.
-     * @param request AddToCartRequest containing product details and quantity.
-     * @param userDetails Authenticated user details (if available from access token).
-     * @param httpRequest HttpServletRequest to read guest_token cookie.
-     * @param httpResponse HttpServletResponse to set new guest_token cookie if needed.
-     * @return ResponseEntity with updated CartDto or error.
-     */
     @PostMapping("/add")
     public ResponseEntity<CartDto> addItemToCart(
-            @RequestBody AddToCartRequest request,
+            @RequestBody AddToCartRequest reqDto,
             @AuthenticationPrincipal UserDetails userDetails,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
+            HttpServletRequest req,
+            HttpServletResponse res) {
 
-        User currentUser = null;
-        if (userDetails != null) {
-            currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
-        }
+        User currentUser = Optional.ofNullable(userDetails)
+                .flatMap(u -> userService.findByUsername(u.getUsername()))
+                .orElse(null);
 
-        UUID guestId = null;
-        // Try to get guest ID from cookie
-        Optional<Cookie> guestCookie = Arrays.stream(Optional.ofNullable(httpRequest.getCookies()).orElse(new Cookie[0]))
-                .filter(cookie -> "guest_token".equals(cookie.getName()))
-                .findFirst();
-
-        if (guestCookie.isPresent()) {
-            String guestJwt = guestCookie.get().getValue();
-            try {
-                guestId = jwtUtil.extractGuestId(guestJwt);
-                if (!jwtUtil.validateGuestToken(guestJwt)) {
-                    guestId = null;
-                    Cookie expiredGuestCookie = new Cookie("guest_token", "");
-                    expiredGuestCookie.setPath("/");
-                    expiredGuestCookie.setHttpOnly(true);
-                    expiredGuestCookie.setMaxAge(0);
-                    httpResponse.addCookie(expiredGuestCookie);
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to extract guest ID from cookie during add to cart: " + e.getMessage());
-                guestId = null;
-            }
-        }
-
-        // If no logged-in user and no valid guest ID, create a new guest ID and token.
+        UUID guestId = getValidGuestIdFromCookie(req, res);
         if (currentUser == null && guestId == null) {
             guestId = UUID.randomUUID();
-            String newGuestToken = jwtUtil.generateGuestToken(guestId);
-
-            Cookie newGuestCookie = new Cookie("guest_token", newGuestToken);
-            newGuestCookie.setHttpOnly(true);
-            newGuestCookie.setPath("/");
-            newGuestCookie.setMaxAge((int) (jwtUtil.getGuestExpiration() / 1000));
-            httpResponse.addCookie(newGuestCookie);
+            String token = jwtUtil.generateGuestToken(guestId);
+            Cookie cookie = new Cookie("guest_token", token);
+            cookie.setHttpOnly(true);
+            cookie.setPath("/");
+            cookie.setMaxAge((int) (jwtUtil.getGuestExpiration() / 1000));
+            res.addCookie(cookie);
         }
 
         try {
-            CartDto updatedCart = cartService.addItemToCart(currentUser, guestId, request);
-            return ResponseEntity.ok(updatedCart);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Or a custom error DTO
+            CartDto updated = cartService.addItemToCart(currentUser, guestId, reqDto);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (Exception ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    "Server error: " + ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
 
+    @PutMapping("/item/{productId}")
+    public ResponseEntity<CartDto> updateItemQuantity(
+            @PathVariable Long productId,
+            @RequestBody QuantityUpdateRequest reqDto,
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest req,
+            HttpServletResponse res) {
 
-    /**
-     * Endpoint to finalize the cart and create an order.
-     * Requires an authenticated user.
-     * @param userDetails Authenticated user details.
-     * @return ResponseEntity with Order ID or error message.
-     */
-    @PreAuthorize("isAuthenticated()") // Ensure only logged-in users can checkout
+        User currentUser = Optional.ofNullable(userDetails)
+                .flatMap(u -> userService.findByUsername(u.getUsername()))
+                .orElse(null);
+
+        UUID guestId = getValidGuestIdFromCookie(req, res);
+
+        try {
+            CartDto updated = cartService.updateItemQuantity(
+                    currentUser, guestId, productId, reqDto.getQuantity());
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (Exception ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    "Server error: " + ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @DeleteMapping("/item/{productId}")
+    public ResponseEntity<CartDto> removeItem(
+            @PathVariable Long productId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest req,
+            HttpServletResponse res) {
+
+        User currentUser = Optional.ofNullable(userDetails)
+                .flatMap(u -> userService.findByUsername(u.getUsername()))
+                .orElse(null);
+
+        UUID guestId = getValidGuestIdFromCookie(req, res);
+
+        try {
+            CartDto updated = cartService.removeItemFromCart(
+                    currentUser, guestId, productId);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (Exception ex) {
+            CartDto error = new CartDto(
+                    null,
+                    Collections.emptyList(),
+                    BigDecimal.ZERO,
+                    0,
+                    null,
+                    "Server error: " + ex.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/checkout")
-    public ResponseEntity<CheckoutResponse> checkoutCart(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<CheckoutResponse> checkoutCart(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
         if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new CheckoutResponse(null, "User not authenticated for checkout.", false));
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new CheckoutResponse(null, "User not authenticated", false));
         }
 
         try {
-            User currentUser = userService.findByUsername(userDetails.getUsername())
-                    .orElseThrow(() -> new RuntimeException("User not found during checkout."));
+            User currentUser = userService
+                    .findByUsername(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
             Order newOrder = cartService.checkoutCart(currentUser);
+            CheckoutResponse resp = new CheckoutResponse(
+                    newOrder.getId(),
+                    "Order placed successfully!",
+                    true
+            );
+            return ResponseEntity.ok(resp);
 
-            return ResponseEntity.ok(new CheckoutResponse(newOrder.getId(), "Order placed successfully!", true));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new CheckoutResponse(null, e.getMessage(), false));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new CheckoutResponse(null, "Failed to place order: " + e.getMessage(), false));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(new CheckoutResponse(null, ex.getMessage(), false));
+        } catch (Exception ex) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new CheckoutResponse(null, "Checkout failed: " + ex.getMessage(), false));
         }
     }
 }
