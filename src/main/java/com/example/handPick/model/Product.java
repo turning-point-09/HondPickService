@@ -27,8 +27,8 @@ public class Product {
     @Column(nullable = false)
     private BigDecimal price; // Use BigDecimal for prices
 
-    // FIX: Ensure stockQuantity is Integer (wrapper class) to allow null values
-    // This resolves "Operator '!=' cannot be applied to 'int', 'null'" error
+    // FIX: stockQuantity is already Integer in your provided code, which is correct.
+    // This allows it to be null, preventing the "Operator '!=' cannot be applied to 'int', 'null'" error.
     private Integer stockQuantity; // Can be null if stock is not specified or managed
 
     private String imageUrl; // Optional image URL
@@ -64,10 +64,15 @@ public class Product {
         if (this.oldPrice != null && this.price != null && this.discountPercentage == null) {
             if (this.oldPrice.compareTo(this.price) > 0) { // oldPrice > price
                 BigDecimal discount = this.oldPrice.subtract(this.price);
-                this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .doubleValue();
-                this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
+                // Ensure divisor is not zero for division
+                if (this.oldPrice.compareTo(BigDecimal.ZERO) != 0) {
+                    this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .doubleValue();
+                    this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
+                } else {
+                    this.discountPercentage = 0.0; // Prevent division by zero if oldPrice is 0
+                }
             } else {
                 this.discountPercentage = 0.0; // No discount if current price is higher or equal
             }
@@ -77,7 +82,7 @@ public class Product {
             if (this.discountPercentage > 0 && this.discountPercentage <= 100) {
                 // oldPrice = price / (1 - discountPercentage / 100)
                 BigDecimal multiplier = BigDecimal.ONE.subtract(BigDecimal.valueOf(this.discountPercentage).divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
-                if (multiplier.compareTo(BigDecimal.ZERO) > 0) { // Avoid division by zero
+                if (multiplier.compareTo(BigDecimal.ZERO) > 0) { // Avoid division by zero or negative
                     this.oldPrice = this.price.divide(multiplier, 2, BigDecimal.ROUND_HALF_UP);
                 } else {
                     this.oldPrice = this.price; // Fallback if multiplier is zero/negative
@@ -92,10 +97,14 @@ public class Product {
         else if (this.oldPrice != null && this.price != null && this.discountPercentage != null) {
             if (this.oldPrice.compareTo(this.price) > 0) {
                 BigDecimal discount = this.oldPrice.subtract(this.price);
-                this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .doubleValue();
-                this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
+                if (this.oldPrice.compareTo(BigDecimal.ZERO) != 0) {
+                    this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .doubleValue();
+                    this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
+                } else {
+                    this.discountPercentage = 0.0; // Prevent division by zero if oldPrice is 0
+                }
             } else {
                 this.discountPercentage = 0.0;
             }

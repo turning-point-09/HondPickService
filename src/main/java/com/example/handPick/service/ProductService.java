@@ -78,8 +78,14 @@ public class ProductService {
 
         product.setName(productDto.getName());
         product.setDescription(productDto.getDescription());
-        product.setPrice(BigDecimal.valueOf(productDto.getPrice()));
+        // Handle conversion from Double to BigDecimal for price
+        product.setPrice(
+                productDto.getPrice() != null
+                        ? BigDecimal.valueOf(productDto.getPrice())
+                        : null // Or BigDecimal.ZERO if price is mandatory and cannot be null
+        );
         product.setImageUrl(productDto.getImageUrl());
+        // FIX: Ensure stockQuantity is correctly set as Integer
         product.setStockQuantity(productDto.getStockQuantity());
         product.setRating(productDto.getRating());
         product.setOldPrice(
@@ -118,8 +124,10 @@ public class ProductService {
         dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
-        dto.setPrice(product.getPrice().doubleValue());
+        // Convert BigDecimal to Double for DTO
+        dto.setPrice(product.getPrice() != null ? product.getPrice().doubleValue() : null);
         dto.setImageUrl(product.getImageUrl());
+        // FIX: stockQuantity is already Integer, so direct assignment is fine
         dto.setStockQuantity(product.getStockQuantity());
         dto.setRating(product.getRating());
         dto.setOldPrice(
