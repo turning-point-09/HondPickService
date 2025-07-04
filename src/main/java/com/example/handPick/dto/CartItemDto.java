@@ -1,11 +1,8 @@
-package com.example.handPick.dto; // Corrected package name to handPick
+package com.example.handPick.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-// No direct BigDecimal import needed if fields are Double, but kept for context if desired.
-// import java.math.BigDecimal;
+import lombok.AllArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -14,10 +11,11 @@ public class CartItemDto {
     private Long id;
     private Long productId;
     private String productName;
-    // FIX: Changed unitPrice to Double to match frontend (number) and CartService conversion
-    private Double unitPrice;
+    private Double unitPrice; // Using Double for frontend display, BigDecimal for backend calculations
     private Integer quantity;
-    // FIX: Changed subtotal to Double to match frontend (number) and CartService conversion
-    private Double subtotal;
-    private String imageUrl; // Optional
+    private Double subtotal;  // Calculated (unitPrice * quantity)
+    private String imageUrl;
+
+    // New: Selected size/unit for the product
+    private String size;
 }

@@ -4,6 +4,7 @@ import com.example.handPick.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod; // Import HttpMethod
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -20,12 +21,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.beans.factory.annotation.Value;
+
 import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Enable @PreAuthorize and @PostAuthorize for method-level security
+@EnableMethodSecurity // Keep this enabled for potential future use or other security features
 public class SecurityConfig {
 
     @Autowired
@@ -60,10 +62,11 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         // Split allowedOrigins string by comma to support multiple origins
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cookie"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")); // Added PATCH
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cookie", "X-Requested-With")); // Added X-Requested-With
         configuration.setAllowCredentials(true); // Crucial for sending/receiving cookies across origins
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie")); // Expose these headers to the client
+        configuration.setMaxAge(3600L); // Cache pre-flight requests for 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration); // Apply CORS to all paths
@@ -76,20 +79,25 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless API (JWT)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS with custom configuration
                 .authorizeHttpRequests(authorize -> authorize
-                        // Public endpoints:
+                        // Public endpoints that do NOT require authentication
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
-                                "/api/cart/**", // Cart operations are public for guests and authenticated users
-                                "/api/products", // GET /api/products should be public for product listing
-                                "/api/products/{id}", // GET /api/products/{id} should be public for single product view
-                                "/h2-console/**" // H2 console for development
+                                "/api/h2-console/**" // H2 console for development
                         ).permitAll() // Permit all access to the above paths
-                        // All other requests require authentication.
-                        // POST, PUT, DELETE for /api/products are secured by @PreAuthorize on the controller methods themselves.
-                        .anyRequest().authenticated() // Any other request not explicitly permitted above requires authentication
+                        .requestMatchers("/api/cart/**").authenticated() // Cart operations require authentication
+
+                        // Specific rules for /api/products endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll() // ONLY GET for /api/products is public
+                        .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll() // GET /api/products/{id} should be public for single product view
+                        .requestMatchers(HttpMethod.POST, "/api/products").authenticated() // POST /api/products requires authentication
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**").authenticated() // PUT /api/products/{id} requires authentication
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").authenticated() // DELETE /api/products/{id} requires authentication
+
+                        // All other requests not explicitly permitted above require authentication
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Use stateless sessions for JWT

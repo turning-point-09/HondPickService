@@ -1,15 +1,15 @@
-package com.example.handPick.model; // Corrected package name to handPick
+package com.example.handPick.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
-import java.math.BigDecimal; // For precise currency handling
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "products") // Explicitly define table name
+@Table(name = "products")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,96 +18,66 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false)
     private String name;
 
-    @Column(columnDefinition = "TEXT") // Use TEXT for potentially long descriptions
+    @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal price;
+
+    @Column(length = 255)
+    private String imageUrl;
+
     @Column(nullable = false)
-    private BigDecimal price; // Use BigDecimal for prices
+    private Integer stockQuantity;
 
-    // FIX: stockQuantity is already Integer in your provided code, which is correct.
-    // This allows it to be null, preventing the "Operator '!=' cannot be applied to 'int', 'null'" error.
-    private Integer stockQuantity; // Can be null if stock is not specified or managed
+    // Removed precision and scale for Double type, as they are not applicable.
+    @Column
+    private Double rating;
 
-    private String imageUrl; // Optional image URL
+    // Removed precision and scale for Double type, as they are not applicable.
+    @Column
+    private Double discountPercentage;
 
-    @Column(scale = 2) // Rating with 2 decimal places
-    private Double rating; // Use Double for rating (0-5)
+    @Column(precision = 19, scale = 2)
+    private BigDecimal oldPrice;
 
-    private BigDecimal oldPrice; // Optional old price for discounts
-
-    private Double discountPercentage; // Optional discount percentage (0-100)
+    @Column(length = 255)
+    private String sizeOptions;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Lifecycle callbacks to ensure consistency before persisting/updating
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        calculateDiscountFields();
+        calculatePriceAndDiscount();
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
-        calculateDiscountFields();
+        calculatePriceAndDiscount();
     }
 
-    // Helper method to calculate oldPrice or discountPercentage if one is provided
-    // This ensures data consistency for pricing and discounts.
-    private void calculateDiscountFields() {
-        // If oldPrice is provided but discountPercentage is not, calculate discountPercentage
-        if (this.oldPrice != null && this.price != null && this.discountPercentage == null) {
-            if (this.oldPrice.compareTo(this.price) > 0) { // oldPrice > price
+    // Helper method to ensure price and discount consistency
+    private void calculatePriceAndDiscount() {
+        if (this.oldPrice != null && this.price != null && this.oldPrice.compareTo(BigDecimal.ZERO) > 0) {
+            if (this.price.compareTo(this.oldPrice) < 0) {
                 BigDecimal discount = this.oldPrice.subtract(this.price);
-                // Ensure divisor is not zero for division
-                if (this.oldPrice.compareTo(BigDecimal.ZERO) != 0) {
-                    this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
-                            .multiply(BigDecimal.valueOf(100))
-                            .doubleValue();
-                    this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
-                } else {
-                    this.discountPercentage = 0.0; // Prevent division by zero if oldPrice is 0
-                }
-            } else {
-                this.discountPercentage = 0.0; // No discount if current price is higher or equal
-            }
-        }
-        // If discountPercentage is provided but oldPrice is not, calculate oldPrice
-        else if (this.discountPercentage != null && this.price != null && this.oldPrice == null) {
-            if (this.discountPercentage > 0 && this.discountPercentage <= 100) {
-                // oldPrice = price / (1 - discountPercentage / 100)
-                BigDecimal multiplier = BigDecimal.ONE.subtract(BigDecimal.valueOf(this.discountPercentage).divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
-                if (multiplier.compareTo(BigDecimal.ZERO) > 0) { // Avoid division by zero or negative
-                    this.oldPrice = this.price.divide(multiplier, 2, BigDecimal.ROUND_HALF_UP);
-                } else {
-                    this.oldPrice = this.price; // Fallback if multiplier is zero/negative
-                }
-            } else {
-                this.oldPrice = this.price; // No old price if discount is invalid or 0
-            }
-        }
-        // If both are provided, you might want to re-evaluate or trust the provided values.
-        // For robustness, if both are provided, we will prioritize oldPrice and recalculate discountPercentage
-        // to ensure consistency between them.
-        else if (this.oldPrice != null && this.price != null && this.discountPercentage != null) {
-            if (this.oldPrice.compareTo(this.price) > 0) {
-                BigDecimal discount = this.oldPrice.subtract(this.price);
-                if (this.oldPrice.compareTo(BigDecimal.ZERO) != 0) {
-                    this.discountPercentage = discount.divide(this.oldPrice, 4, BigDecimal.ROUND_HALF_UP)
-                            .multiply(BigDecimal.valueOf(100))
-                            .doubleValue();
-                    this.discountPercentage = Math.round(this.discountPercentage * 100.0) / 100.0; // Round to 2 decimal places
-                } else {
-                    this.discountPercentage = 0.0; // Prevent division by zero if oldPrice is 0
-                }
+                // Ensure scale is set for division result before converting to double
+                this.discountPercentage = discount.divide(this.oldPrice, 4, java.math.RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .doubleValue();
             } else {
                 this.discountPercentage = 0.0;
             }
+        } else {
+            this.oldPrice = null;
+            this.discountPercentage = 0.0;
         }
     }
 }

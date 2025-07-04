@@ -26,9 +26,6 @@ public class JwtUtil {
     @Value("${jwt.refresh.expiration}")
     private long refreshExpiration; // milliseconds for refresh token
 
-    @Value("${jwt.guest.expiration}")
-    private long guestExpiration; // milliseconds for guest token
-
     /**
      * Decodes the Base64 secret string and creates a SecretKey for signing/verifying JWTs.
      * This method ensures the key is securely generated and compatible with HS512.
@@ -67,17 +64,6 @@ public class JwtUtil {
     }
 
     /**
-     * Generates a token for guest users. The subject of this token will be the guestId.
-     * @param guestId The UUID representing the guest.
-     * @return A signed JWT guest token.
-     */
-    public String generateGuestToken(UUID guestId) { // Corrected parameter type to UUID
-        Map<String, Object> claims = new HashMap<>();
-        // No specific claims needed for guest, subject is the guestId
-        return createToken(claims, guestId.toString(), guestExpiration); // Subject is UUID as String
-    }
-
-    /**
      * Internal method to create a JWT.
      * @param claims Custom claims to include in the JWT.
      * @param subject The subject of the JWT (e.g., username, guestId).
@@ -101,22 +87,6 @@ public class JwtUtil {
      */
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
-    }
-
-    /**
-     * Extracts the guest ID (UUID) from a guest JWT.
-     * Assumes the guest ID is stored as the 'subject' claim in the token.
-     * @param token The guest JWT string.
-     * @return The UUID of the guest, or null if the subject is not a valid UUID.
-     */
-    public UUID extractGuestId(String token) {
-        String guestIdString = extractClaim(token, Claims::getSubject);
-        try {
-            return UUID.fromString(guestIdString);
-        } catch (IllegalArgumentException e) {
-            System.err.println("Token subject is not a valid UUID for guest ID: " + guestIdString);
-            return null;
-        }
     }
 
     /**
@@ -165,26 +135,6 @@ public class JwtUtil {
     }
 
     /**
-     * Validates a guest token by checking its signature and expiration.
-     * @param token The guest JWT string.
-     * @return True if the guest token is valid and not expired, false otherwise.
-     */
-    public Boolean validateGuestToken(String token) {
-        try {
-            // Attempt to extract all claims; this will throw if signature is invalid or token is malformed
-            extractAllClaims(token);
-            // If extraction succeeds, just check expiration
-            return !isTokenExpired(token);
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            System.err.println("Guest token expired: " + e.getMessage());
-            return false;
-        } catch (Exception e) {
-            System.err.println("Guest token validation failed (malformed or invalid signature): " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Checks if a JWT token has expired.
      * @param token The JWT string.
      * @return True if the token is expired, false otherwise.
@@ -201,9 +151,5 @@ public class JwtUtil {
 
     public long getRefreshExpiration() {
         return refreshExpiration;
-    }
-
-    public long getGuestExpiration() {
-        return guestExpiration;
     }
 }

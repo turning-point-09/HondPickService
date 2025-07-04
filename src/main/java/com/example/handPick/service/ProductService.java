@@ -1,13 +1,13 @@
 package com.example.handPick.service;
 
 import com.example.handPick.dto.ProductDto;
+import com.example.handPick.dto.ProductUpdateDto;
 import com.example.handPick.model.Product;
 import com.example.handPick.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,85 +23,103 @@ public class ProductService {
     }
 
     /**
-     * Retrieve all products as DTOs.
+     * Finds all products and converts them to DTOs.
+     * @return A list of ProductDto.
      */
-    @Transactional(readOnly = true)
     public List<ProductDto> findAllProducts() {
-        return productRepository.findAll()
-                .stream()
+        return productRepository.findAll().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Get a single product DTO by its ID.
-     * Throws RuntimeException if not found.
+     * Finds a product by its ID and converts it to a DTO.
+     * @param id The ID of the product.
+     * @return An Optional containing the ProductDto if found.
      */
-    @Transactional(readOnly = true)
-    public ProductDto getProductById(Long id) {
-        return findById(id)
-                .map(this::convertToDto)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+    public Optional<ProductDto> getProductDtoById(Long id) {
+        return productRepository.findById(id).map(this::convertToDto);
     }
 
     /**
-     * Expose the raw Product entity wrapped in Optional.
-     * Used by CartService to fetch and mutate stock etc.
+     * Finds a product entity by its ID.
+     * @param id The ID of the product.
+     * @return An Optional containing the Product entity if found.
      */
-    @Transactional(readOnly = true)
     public Optional<Product> getProductEntityById(Long id) {
         return productRepository.findById(id);
     }
 
     /**
-     * Expose an Optional DTO if needed elsewhere.
-     */
-    @Transactional(readOnly = true)
-    public Optional<ProductDto> getProductDtoById(Long id) {
-        return findById(id).map(this::convertToDto);
-    }
-
-    private Optional<Product> findById(Long id) {
-        return productRepository.findById(id);
-    }
-
-    /**
-     * Save or update a Product via DTO → Entity → DTO.
+     * Saves a product (either creates a new one or updates an existing one).
+     * @param productDto The ProductDto to save.
+     * @return The saved ProductDto.
+     * @throws RuntimeException if product not found for update.
      */
     @Transactional
     public ProductDto saveProduct(ProductDto productDto) {
-        Product product = productDto.getId() != null
-                ? productRepository.findById(productDto.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Product not found for update: " + productDto.getId()))
-                : new Product();
+        Product product;
+        if (productDto.getId() == null) {
+            // Create new product
+            product = new Product();
+        } else {
+            // Update existing product
+            product = productRepository.findById(productDto.getId())
+                    .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productDto.getId()));
+        }
 
+        // Map fields from DTO to entity
         product.setName(productDto.getName());
         product.setDescription(productDto.getDescription());
-        // Handle conversion from Double to BigDecimal for price
-        product.setPrice(
-                productDto.getPrice() != null
-                        ? BigDecimal.valueOf(productDto.getPrice())
-                        : null // Or BigDecimal.ZERO if price is mandatory and cannot be null
-        );
+        // FIX: Directly assign BigDecimal values; no need for BigDecimal.valueOf()
+        product.setPrice(productDto.getPrice()); // Correct: productDto.getPrice() is already BigDecimal
         product.setImageUrl(productDto.getImageUrl());
-        // FIX: Ensure stockQuantity is correctly set as Integer
         product.setStockQuantity(productDto.getStockQuantity());
         product.setRating(productDto.getRating());
-        product.setOldPrice(
-                productDto.getOldPrice() != null
-                        ? BigDecimal.valueOf(productDto.getOldPrice())
-                        : null
-        );
-        product.setDiscountPercentage(productDto.getDiscountPercentage());
+        product.setOldPrice(productDto.getOldPrice()); // Correct: productDto.getOldPrice() is already BigDecimal
+        product.setSizeOptions(productDto.getSizeOptions());
 
-        Product saved = productRepository.save(product);
-        return convertToDto(saved);
+        Product savedProduct = productRepository.save(product);
+        return convertToDto(savedProduct);
     }
 
     /**
-     * Directly save or update a Product entity.
-     * Used internally by CartService when adjusting stock.
+     * Updates an existing product with data from the ProductUpdateDto.
+     * @param id The ID of the product to update.
+     * @param updateDto The ProductUpdateDto containing the updated data.
+     * @return The updated ProductDto.
+     * @throws RuntimeException if the product is not found.
+     */
+    @Transactional
+    public ProductDto updateProduct(Long id, ProductUpdateDto updateDto) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+
+        if (updateDto.getName() != null) {
+            product.setName(updateDto.getName());
+        }
+        if (updateDto.getDescription() != null) {
+            product.setDescription(updateDto.getDescription());
+        }
+        if (updateDto.getPrice() != null) {
+            product.setPrice(updateDto.getPrice());
+        }
+        if (updateDto.getImageUrl() != null) {
+            product.setImageUrl(updateDto.getImageUrl());
+        }
+        if (updateDto.getStockQuantity() != null) {
+            product.setStockQuantity(updateDto.getStockQuantity());
+        }
+
+        Product updatedProduct = productRepository.save(product);
+        return convertToDto(updatedProduct);
+    }
+
+
+    /**
+     * Saves a Product entity directly. Used internally, e.g., by CartService for stock updates.
+     * @param product The Product entity to save.
+     * @return The saved Product entity.
      */
     @Transactional
     public Product saveProductEntity(Product product) {
@@ -109,33 +127,37 @@ public class ProductService {
     }
 
     /**
-     * Delete a product by ID.
+     * Deletes a product by its ID.
+     * @param id The ID of the product to delete.
+     * @throws RuntimeException if product not found.
      */
     @Transactional
     public void deleteProduct(Long id) {
+        if (!productRepository.existsById(id)) {
+            throw new RuntimeException("Product not found with ID: " + id);
+        }
         productRepository.deleteById(id);
     }
 
-    // ----------------------------------------------------------------
-    // Conversion helper: Entity → DTO
-    // ----------------------------------------------------------------
+    /**
+     * Converts a Product entity to a ProductDto.
+     * @param product The Product entity to convert.
+     * @return The corresponding ProductDto.
+     */
     private ProductDto convertToDto(Product product) {
         ProductDto dto = new ProductDto();
         dto.setId(product.getId());
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
-        // Convert BigDecimal to Double for DTO
-        dto.setPrice(product.getPrice() != null ? product.getPrice().doubleValue() : null);
+        dto.setPrice(product.getPrice());
         dto.setImageUrl(product.getImageUrl());
-        // FIX: stockQuantity is already Integer, so direct assignment is fine
         dto.setStockQuantity(product.getStockQuantity());
         dto.setRating(product.getRating());
-        dto.setOldPrice(
-                product.getOldPrice() != null
-                        ? product.getOldPrice().doubleValue()
-                        : null
-        );
+        dto.setOldPrice(product.getOldPrice());
         dto.setDiscountPercentage(product.getDiscountPercentage());
+        dto.setSizeOptions(product.getSizeOptions());
+        dto.setCreatedAt(product.getCreatedAt());
+        dto.setUpdatedAt(product.getUpdatedAt());
         return dto;
     }
 }

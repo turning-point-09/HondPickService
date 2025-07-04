@@ -1,4 +1,4 @@
-package com.example.handPick.dto; // UPDATED
+package com.example.handPick.dto;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,19 +14,11 @@ import java.util.List;
 public class CartDto {
     private Long id;
     private List<CartItemDto> items = new ArrayList<>();
-    private BigDecimal totalPrice = BigDecimal.ZERO;
+    private BigDecimal subtotalBeforeTax = BigDecimal.ZERO; // New: Subtotal before tax
+    private BigDecimal gstAmount = BigDecimal.ZERO;         // New: Calculated GST amount
+    private BigDecimal totalAmount = BigDecimal.ZERO;       // New: Total including GST
     private int totalItems;
     private Long userId; // For authenticated users
 
     private String status; // e.g., "ACTIVE", "ORDERED"
 }
-
-//@Data
-//public class CartDto {
-//    private Long id; // For persisted carts
-//    private BigDecimal totalPrice;
-//    private int totalItems;
-//    private List<CartItemDto> items;
-//    private UUID guestId; // UUID for guest sessions
-//    private Long userId; // For authenticated users
-//}
