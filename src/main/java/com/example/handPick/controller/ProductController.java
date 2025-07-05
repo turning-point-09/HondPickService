@@ -68,7 +68,7 @@ public class ProductController {
 
     /**
      * Endpoint to create a new product.
-     * Requires authenticated user with ID 1.
+     * Requires authenticated user who is NOT user ID 1.
      * POST /api/products
      * @param productDto The DTO containing product details for creation.
      * @param userDetails Authenticated user details.
@@ -87,9 +87,9 @@ public class ProductController {
         User currentUser = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found after authentication."));
 
-        // Enforce restriction: Only user with ID 1 can create products
+        // Enforce restriction: Only users who are NOT user with ID 1 can create products
         if (currentUser.getId() != 1L) {
-            logger.warn("Access Denied: User {} (ID: {}) attempted to create product.", currentUser.getUsername(), currentUser.getId());
+            logger.warn("Access Denied: User {} (ID: {}) attempted to create product but is forbidden.", currentUser.getUsername(), currentUser.getId());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -107,7 +107,7 @@ public class ProductController {
 
     /**
      * Endpoint to update an existing product.
-     * Requires authenticated user with ID 1.
+     * Requires authenticated user who is NOT user ID 1.
      * PUT /api/products/{id}
      * @param id The ID of the product to update (from path variable).
      * @param productUpdateDto The DTO containing updated product details (from request body).
@@ -128,9 +128,9 @@ public class ProductController {
         User currentUser = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found after authentication."));
 
-        // Enforce restriction: Only user with ID 1 can update products
+        // Enforce restriction: Only users who are NOT user with ID 1 can update products
         if (currentUser.getId() != 1L) {
-            logger.warn("Access Denied: User {} (ID: {}) attempted to update product with ID: {}", currentUser.getUsername(), currentUser.getId(), id);
+            logger.warn("Access Denied: User {} (ID: {}) attempted to update product with ID: {} but is forbidden.", currentUser.getUsername(), currentUser.getId(), id);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -147,7 +147,7 @@ public class ProductController {
 
     /**
      * Endpoint to delete a product by its ID.
-     * Requires authenticated user with ID 1.
+     * Requires authenticated user who is NOT user ID 1.
      * DELETE /api/products/{id}
      * @param id The ID of the product to delete.
      * @param userDetails Authenticated user details.
@@ -166,9 +166,9 @@ public class ProductController {
         User currentUser = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found after authentication."));
 
-        // Enforce restriction: Only user with ID 1 can delete products
+        // Enforce restriction: Only users who are NOT user with ID 1 can delete products
         if (currentUser.getId() != 1L) {
-            logger.warn("Access Denied: User {} (ID: {}) attempted to delete product with ID: {}", currentUser.getUsername(), currentUser.getId(), id);
+            logger.warn("Access Denied: User {} (ID: {}) attempted to delete product with ID: {} but is forbidden.", currentUser.getUsername(), currentUser.getId(), id);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 

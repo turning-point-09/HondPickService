@@ -1,5 +1,6 @@
 package com.example.handPick.service;
 
+import com.example.handPick.controller.AuthController;
 import com.example.handPick.dto.AddToCartRequest;
 import com.example.handPick.dto.CartDto;
 import com.example.handPick.dto.CartItemDto;
@@ -28,9 +29,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class CartService {
+    private static final Logger logger = LoggerFactory.getLogger(CartService.class);
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -387,10 +391,12 @@ public class CartService {
      * @param user The user for whom to create the cart.
      * @return The newly created Cart entity.
      */
+    @Transactional
     private Cart createNewCartForUser(User user) {
         Cart cart = new Cart();
         cart.setUser(user);
         cart.setStatus(Cart.CartStatus.ACTIVE);
+        logger.info("Creating new cart for user: {}", user.getId());
         // createdAt and updatedAt handled by @PrePersist in Cart entity
         return cartRepository.save(cart);
     }

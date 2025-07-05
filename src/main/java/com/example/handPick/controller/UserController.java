@@ -18,6 +18,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
+@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 public class UserController {
 
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
@@ -36,7 +37,7 @@ public class UserController {
     @GetMapping("/me/id")
     public ResponseEntity<Long> getCurrentUserId(@AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
-            logger.warn("Unauthorized access attempt to /me/id: No user details.");
+            logger.warn("Unauthorized access attempt to /me/id: No user details. {}",userDetails);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
