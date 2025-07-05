@@ -1,6 +1,8 @@
 package com.example.handPick.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -18,13 +20,15 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name;
-
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(nullable = false)
+    @NotBlank(message = "Product name is required")
+    private String name;
+
     @Column(nullable = false, precision = 19, scale = 2)
+    @Min(value = 0, message = "Price cannot be negative")
     private BigDecimal price;
 
     @Column(length = 255)

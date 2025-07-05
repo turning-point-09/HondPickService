@@ -160,4 +160,16 @@ public class ProductService {
         dto.setUpdatedAt(product.getUpdatedAt());
         return dto;
     }
+
+    /**
+     * Searches for products by a given search term in their name or description (case-insensitive).
+     * @param searchTerm The term to search for.
+     * @return A list of matching ProductDto.
+     */
+    public List<ProductDto> searchProducts(String searchTerm) {
+        // The repository method takes the same searchTerm for both name and description
+        return productRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm).stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
 }
