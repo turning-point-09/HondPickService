@@ -60,15 +60,30 @@ public class ProductController {
         } else {
             Pageable pageable = PageRequest.of(page, size);
             logger.info("Fetching products with search term: '{}', page: {}, size: {}", q, page, size);
-            Page<ProductDto> productsPage = productService.searchProducts(q != null ? q : "", pageable);
-            ProductPageResponse response = new ProductPageResponse(
-                productsPage.getContent(),
-                productsPage.getTotalPages(),
-                productsPage.getTotalElements(),
-                productsPage.getNumber() + 1, // 1-based page number
-                productsPage.getSize()
-            );
-            return ResponseEntity.ok(response);
+            
+            // If search term is empty or null, get all products with pagination
+            if (q == null || q.trim().isEmpty()) {
+                Page<ProductDto> productsPage = productService.findAllProducts(pageable);
+                ProductPageResponse response = new ProductPageResponse(
+                    productsPage.getContent(),
+                    productsPage.getTotalPages(),
+                    productsPage.getTotalElements(),
+                    productsPage.getNumber() + 1, // 1-based page number
+                    productsPage.getSize()
+                );
+                return ResponseEntity.ok(response);
+            } else {
+                // Search with the provided term
+                Page<ProductDto> productsPage = productService.searchProducts(q.trim(), pageable);
+                ProductPageResponse response = new ProductPageResponse(
+                    productsPage.getContent(),
+                    productsPage.getTotalPages(),
+                    productsPage.getTotalElements(),
+                    productsPage.getNumber() + 1, // 1-based page number
+                    productsPage.getSize()
+                );
+                return ResponseEntity.ok(response);
+            }
         }
     }
 

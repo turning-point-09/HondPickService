@@ -36,6 +36,16 @@ public class ProductService {
     }
 
     /**
+     * Finds all products with pagination and converts them to DTOs.
+     * @param pageable The pagination parameters.
+     * @return A Page of ProductDto.
+     */
+    public Page<ProductDto> findAllProducts(Pageable pageable) {
+        return productRepository.findAll(pageable)
+                .map(this::convertToDto);
+    }
+
+    /**
      * Finds a product by its ID and converts it to a DTO.
      * @param id The ID of the product.
      * @return An Optional containing the ProductDto if found.
