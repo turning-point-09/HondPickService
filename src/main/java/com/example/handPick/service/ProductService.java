@@ -204,8 +204,25 @@ public class ProductService {
     // In ProductService.java
 
     public Page<ProductDto> searchProducts(String searchTerm, Pageable pageable) {
-        return productRepository
-                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm, pageable)
-                .map(this::convertToDto);
+        System.out.println("=== SEARCH DEBUG ===");
+        System.out.println("Searching for term: '" + searchTerm + "'");
+        
+        // First, let's see all products to understand what we're searching
+        List<Product> allProducts = productRepository.findAll();
+        System.out.println("Total products in database: " + allProducts.size());
+        for (Product p : allProducts) {
+            System.out.println("Product: ID=" + p.getId() + ", Name='" + p.getName() + "', Description='" + p.getDescription() + "'");
+        }
+        
+        Page<Product> results = productRepository.searchByNameOrDescription(searchTerm, pageable);
+        System.out.println("Found " + results.getTotalElements() + " products matching '" + searchTerm + "'");
+        
+        // Show which products matched
+        for (Product p : results.getContent()) {
+            System.out.println("MATCHED: ID=" + p.getId() + ", Name='" + p.getName() + "', Description='" + p.getDescription() + "'");
+        }
+        System.out.println("=== END SEARCH DEBUG ===");
+        
+        return results.map(this::convertToDto);
     }
 }

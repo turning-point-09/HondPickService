@@ -43,14 +43,18 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<?> getAllProductsOrSearch(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "-1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
+        // Use 'q' parameter if provided, otherwise use 'search' parameter
+        String searchTerm = q != null ? q : search;
+
         // If page is not specified (default -1), return all products without pagination
         if (page == -1) {
-            if (q != null && !q.trim().isEmpty()) {
-                logger.info("Searching products with term: {}", q);
-                List<ProductDto> products = productService.searchProducts(q);
+            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                logger.info("Searching products with term: {}", searchTerm);
+                List<ProductDto> products = productService.searchProducts(searchTerm);
                 return ResponseEntity.ok(products);
             } else {
                 logger.info("Fetching all products.");
@@ -59,10 +63,10 @@ public class ProductController {
             }
         } else {
             Pageable pageable = PageRequest.of(page, size);
-            logger.info("Fetching products with search term: '{}', page: {}, size: {}", q, page, size);
+            logger.info("Fetching products with search term: '{}', page: {}, size: {}", searchTerm, page, size);
             
             // If search term is empty or null, get all products with pagination
-            if (q == null || q.trim().isEmpty()) {
+            if (searchTerm == null || searchTerm.trim().isEmpty()) {
                 Page<ProductDto> productsPage = productService.findAllProducts(pageable);
                 ProductPageResponse response = new ProductPageResponse(
                     productsPage.getContent(),
@@ -74,7 +78,15 @@ public class ProductController {
                 return ResponseEntity.ok(response);
             } else {
                 // Search with the provided term
-                Page<ProductDto> productsPage = productService.searchProducts(q.trim(), pageable);
+                System.out.println("=== CONTROLLER DEBUG ===");
+                System.out.println("Search term received: '" + searchTerm + "'");
+                System.out.println("Search term trimmed: '" + searchTerm.trim() + "'");
+                System.out.println("Page: " + page + ", Size: " + size);
+                
+                Page<ProductDto> productsPage = productService.searchProducts(searchTerm.trim(), pageable);
+                System.out.println("Controller: Found " + productsPage.getTotalElements() + " products");
+                System.out.println("=== END CONTROLLER DEBUG ===");
+                
                 ProductPageResponse response = new ProductPageResponse(
                     productsPage.getContent(),
                     productsPage.getTotalPages(),
