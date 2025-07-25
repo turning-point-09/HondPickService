@@ -39,7 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String jwtToken = null;
-        String username = null;
+        String mobileNumber = null;
 
         // 1. Try to extract JWT from "jwt_token" cookie
         Optional<Cookie> jwtCookie = Arrays.stream(Optional.ofNullable(request.getCookies()).orElse(new Cookie[0]))
@@ -49,11 +49,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (jwtCookie.isPresent()) {
             jwtToken = jwtCookie.get().getValue();
             try {
-                username = jwtUtil.extractUsername(jwtToken);
-                logger.debug("JWT Token found in cookie. Extracted username: {}", username);
+                mobileNumber = jwtUtil.extractMobileNumber(jwtToken);
+                logger.debug("JWT Token found in cookie. Extracted mobile number: {}", mobileNumber);
             } catch (ExpiredJwtException e) {
                 logger.warn("JWT Token is expired: {}", e.getMessage());
-                // Optionally clear the expired cookie
                 clearCookie(response, "jwt_token", "/");
             } catch (SignatureException e) {
                 logger.warn("JWT Token has invalid signature: {}", e.getMessage());
@@ -70,17 +69,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             logger.debug("No 'jwt_token' cookie found in request.");
         }
 
-        // 2. If username is extracted and no authentication is currently set in SecurityContext
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        // 2. If mobileNumber is extracted and no authentication is currently set in SecurityContext
+        if (mobileNumber != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = null;
             try {
-                userDetails = userDetailsService.loadUserByUsername(username);
+                userDetails = userDetailsService.loadUserByUsername(mobileNumber);
             } catch (Exception e) {
-                logger.warn("User details not found for username {}: {}", username, e.getMessage());
-                // If user details cannot be loaded, it means the user might no longer exist or there's a DB issue.
-                // Invalidate the token to force re-authentication.
+                logger.warn("User details not found for mobile number {}: {}", mobileNumber, e.getMessage());
                 clearCookie(response, "jwt_token", "/");
-                username = null; // Prevent further processing with this username
+                mobileNumber = null;
             }
 
             if (userDetails != null && jwtToken != null && jwtUtil.validateToken(jwtToken, userDetails)) {
@@ -88,9 +85,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
-                logger.debug("User {} authenticated successfully via JWT.", username);
+                logger.debug("User {} authenticated successfully via JWT.", mobileNumber);
             } else if (jwtToken != null) {
-                logger.warn("JWT Token validation failed for user: {}", username);
+                logger.warn("JWT Token validation failed for user: {}", mobileNumber);
                 clearCookie(response, "jwt_token", "/");
             }
         }
@@ -101,15 +98,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     /**
      * Helper method to clear a specific cookie.
-     * @param response HttpServletResponse to add the expired cookie to.
-     * @param name The name of the cookie to clear.
-     * @param path The path of the cookie to clear.
      */
     private void clearCookie(HttpServletResponse response, String name, String path) {
         Cookie cookie = new Cookie(name, "");
         cookie.setPath(path);
         cookie.setHttpOnly(true);
-        cookie.setMaxAge(0); // Set max age to 0 to delete the cookie
+        cookie.setMaxAge(0);
         response.addCookie(cookie);
         logger.debug("Cleared cookie: {}", name);
     }

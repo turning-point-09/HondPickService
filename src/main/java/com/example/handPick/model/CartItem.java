@@ -31,24 +31,23 @@ public class CartItem {
     @Column(nullable = false, precision = 19, scale = 2) // Snapshot of price at time of adding to cart
     private BigDecimal price;
 
-    // New: Stores the selected size/unit for the product in the cart
-    @Column(length = 50, nullable = true) // Make nullable as not all products might have sizes
+    // Stores the selected size/unit for the product in the cart
+    @Column(length = 50, nullable = true)
     private String size;
 
     public CartItem(Product product, Integer quantity, Cart cart) {
         this.product = product;
         this.quantity = quantity;
         this.cart = cart;
-        this.price = product.getPrice(); // Capture current price of the product
+        this.price = product.getPrice();
         // Size will be set separately or default to null if not provided
     }
 
-    // Constructor for when size is provided
     public CartItem(Product product, Integer quantity, Cart cart, String size) {
         this.product = product;
         this.quantity = quantity;
         this.cart = cart;
-        this.price = product.getPrice(); // Capture current price of the product
+        this.price = product.getPrice();
         this.size = size;
     }
 }

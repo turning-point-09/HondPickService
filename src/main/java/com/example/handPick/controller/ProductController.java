@@ -2,23 +2,26 @@ package com.example.handPick.controller;
 
 import com.example.handPick.dto.ProductDto;
 import com.example.handPick.dto.ProductUpdateDto;
+import com.example.handPick.dto.ProductPageResponse;
 import com.example.handPick.model.User;
 import com.example.handPick.service.ProductService;
 import com.example.handPick.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.List;
-import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/api/v1/products")
 public class ProductController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
@@ -32,32 +35,46 @@ public class ProductController {
     }
 
     /**
-     * Endpoint to retrieve all products or search products by name/description.
-     * Accessible by anyone.
-     * GET /api/products?q={searchTerm}
-     * GET /api/products
-     * @param q Optional search term for name or description.
-     * @return ResponseEntity with a list of ProductDto.
+     * GET /api/v1/products?q={searchTerm}&page={page}&size={size}
+     * GET /api/v1/products?q={searchTerm}
+     * GET /api/v1/products
+     * Retrieve all products or search by name/description with optional pagination.
      */
     @GetMapping
-    public ResponseEntity<List<ProductDto>> getAllProductsOrSearch(@RequestParam(required = false) String q) {
-        if (q != null && !q.trim().isEmpty()) {
-            logger.info("Searching products with term: {}", q);
-            List<ProductDto> products = productService.searchProducts(q);
-            return ResponseEntity.ok(products);
+    public ResponseEntity<?> getAllProductsOrSearch(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "-1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        // If page is not specified (default -1), return all products without pagination
+        if (page == -1) {
+            if (q != null && !q.trim().isEmpty()) {
+                logger.info("Searching products with term: {}", q);
+                List<ProductDto> products = productService.searchProducts(q);
+                return ResponseEntity.ok(products);
+            } else {
+                logger.info("Fetching all products.");
+                List<ProductDto> products = productService.findAllProducts();
+                return ResponseEntity.ok(products);
+            }
         } else {
-            logger.info("Fetching all products.");
-            List<ProductDto> products = productService.findAllProducts();
-            return ResponseEntity.ok(products);
+            Pageable pageable = PageRequest.of(page, size);
+            logger.info("Fetching products with search term: '{}', page: {}, size: {}", q, page, size);
+            Page<ProductDto> productsPage = productService.searchProducts(q != null ? q : "", pageable);
+            ProductPageResponse response = new ProductPageResponse(
+                productsPage.getContent(),
+                productsPage.getTotalPages(),
+                productsPage.getTotalElements(),
+                productsPage.getNumber() + 1, // 1-based page number
+                productsPage.getSize()
+            );
+            return ResponseEntity.ok(response);
         }
     }
 
     /**
-     * Endpoint to retrieve a single product by its ID.
-     * Accessible by anyone. This serves as the backend for the product detail page.
-     * GET /api/products/{id}
-     * @param id The ID of the product to retrieve.
-     * @return ResponseEntity with ProductDto if found, or 404 Not Found.
+     * GET /api/v1/products/{id}
+     * Retrieve a single product by its ID.
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDto> getProductById(@PathVariable Long id) {
@@ -75,14 +92,10 @@ public class ProductController {
     }
 
     /**
-     * Endpoint to create a new product.
-     * Requires authenticated user with specific authorization (e.g., ADMIN role).
-     * For demonstration, this example grants access to user with ID 1.
-     * POST /api/products
-     * @param productDto The DTO containing product details for creation.
-     * @param userDetails Authenticated user details.
-     * @return ResponseEntity with the created ProductDto and 201 Created status, or 403 Forbidden, or 401 Unauthorized.
+     * POST /api/v1/products
+     * Create a new product (admin only).
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ProductDto> createProduct(
             @Valid @RequestBody ProductDto productDto,
@@ -93,45 +106,26 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        User currentUser = userService.findByUsername(userDetails.getUsername())
-                .orElseGet(() -> {
-                    logger.error("Authenticated user '{}' not found in database. This indicates a configuration issue.", userDetails.getUsername());
-                    // In a real app, this might be a 500 Internal Server Error or more specific handling.
-                    throw new RuntimeException("Authenticated user not found.");
-                });
-
-        // IMPORTANT: This is a simplified, hardcoded authorization check for demonstration.
-        // In a real application, use Spring Security's role-based or authority-based access control
-        // (e.g., @PreAuthorize("hasRole('ADMIN')") or @PreAuthorize("hasAuthority('product:create')"))
-        // and assign roles/authorities to users.
-        if (currentUser.getId() != 1L) { // Changed condition: User ID 1 is now allowed to create.
-            logger.warn("Access Denied: User {} (ID: {}) attempted to create product but is not authorized (only user ID 1 can for this demo).", currentUser.getUsername(), currentUser.getId());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found."));
 
         logger.info("Attempting to create new product: {} by user ID: {}", productDto.getName(), currentUser.getId());
-        productDto.setId(null); // Ensure ID is null for new product creation, as it's auto-generated
+        productDto.setId(null); // Ensure ID is null for new product creation
         try {
             ProductDto created = productService.saveProduct(productDto);
             logger.info("Product created successfully with ID: {}", created.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch (Exception e) { // Catch more general Exception for robustness
+        } catch (Exception e) {
             logger.error("Failed to create product {}: {}", productDto.getName(), e.getMessage(), e);
-            // Consider custom exceptions in service layer for specific error types (e.g., InvalidProductDataException)
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null); // Return 400 for validation/bad data issues
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
 
     /**
-     * Endpoint to update an existing product.
-     * Requires authenticated user with specific authorization (e.g., ADMIN role).
-     * For demonstration, this example grants access to user with ID 1.
-     * PUT /api/products/{id}
-     * @param id The ID of the product to update (from path variable).
-     * @param productUpdateDto The DTO containing updated product details (from request body).
-     * @param userDetails Authenticated user details.
-     * @return ResponseEntity with the updated ProductDto, or 404 Not Found, or 403 Forbidden, or 401 Unauthorized.
+     * PUT /api/v1/products/{id}
+     * Update an existing product (admin only).
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductDto> updateProduct(
             @PathVariable Long id,
@@ -143,43 +137,28 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        User currentUser = userService.findByUsername(userDetails.getUsername())
-                .orElseGet(() -> {
-                    logger.error("Authenticated user '{}' not found in database. This indicates a configuration issue.", userDetails.getUsername());
-                    throw new RuntimeException("Authenticated user not found.");
-                });
-
-        // IMPORTANT: This is a simplified, hardcoded authorization check for demonstration.
-        // In a real application, use Spring Security's role-based or authority-based access control.
-        if (currentUser.getId() != 1L) { // Changed condition: User ID 1 is now allowed to update.
-            logger.warn("Access Denied: User {} (ID: {}) attempted to update product with ID: {} but is not authorized (only user ID 1 can for this demo).", currentUser.getUsername(), currentUser.getId(), id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found."));
 
         logger.info("Attempting to update product with ID: {} by user ID: {}", id, currentUser.getId());
         try {
             ProductDto updated = productService.updateProduct(id, productUpdateDto);
             logger.info("Product updated successfully with ID: {}", updated.getId());
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) { // Catch the RuntimeException thrown by service for "not found"
+        } catch (RuntimeException e) {
             logger.error("Failed to update product with ID {}: {}", id, e.getMessage(), e);
-            // Assuming RuntimeException from service means product not found
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } catch (Exception e) { // Catch other potential exceptions during update
+        } catch (Exception e) {
             logger.error("An unexpected error occurred while updating product with ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     /**
-     * Endpoint to delete a product by its ID.
-     * Requires authenticated user with specific authorization (e.g., ADMIN role).
-     * For demonstration, this example grants access to user with ID 1.
-     * DELETE /api/products/{id}
-     * @param id The ID of the product to delete.
-     * @param userDetails Authenticated user details.
-     * @return ResponseEntity with 204 No Content status upon successful deletion, or 403 Forbidden, or 401 Unauthorized.
+     * DELETE /api/v1/products/{id}
+     * Delete a product by its ID (admin only).
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(
             @PathVariable Long id,
@@ -190,29 +169,18 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        User currentUser = userService.findByUsername(userDetails.getUsername())
-                .orElseGet(() -> {
-                    logger.error("Authenticated user '{}' not found in database. This indicates a configuration issue.", userDetails.getUsername());
-                    throw new RuntimeException("Authenticated user not found.");
-                });
-
-        // IMPORTANT: This is a simplified, hardcoded authorization check for demonstration.
-        // In a real application, use Spring Security's role-based or authority-based access control.
-        if (currentUser.getId() != 1L) { // Changed condition: User ID 1 is now allowed to delete.
-            logger.warn("Access Denied: User {} (ID: {}) attempted to delete product with ID: {} but is not authorized (only user ID 1 can for this demo).", currentUser.getUsername(), currentUser.getId(), id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found."));
 
         logger.info("Attempting to delete product with ID: {} by user ID: {}", id, currentUser.getId());
         try {
             productService.deleteProduct(id);
             logger.info("Product deleted successfully with ID: {}", id);
-            return ResponseEntity.noContent().build(); // 204 No Content indicates successful deletion
-        } catch (RuntimeException e) { // Catch the RuntimeException thrown by service for "not found"
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
             logger.error("Failed to delete product with ID {}: {}", id, e.getMessage(), e);
-            // Assuming RuntimeException from service means product not found
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } catch (Exception e) { // Catch other potential exceptions during delete
+        } catch (Exception e) {
             logger.error("An unexpected error occurred while deleting product with ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

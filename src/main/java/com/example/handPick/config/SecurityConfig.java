@@ -2,9 +2,10 @@ package com.example.handPick.config;
 
 import com.example.handPick.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; // Import HttpMethod
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -20,14 +21,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Keep this enabled for potential future use or other security features
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -60,51 +59,46 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Split allowedOrigins string by comma to support multiple origins
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")); // Added PATCH
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cookie", "X-Requested-With")); // Added X-Requested-With
-        configuration.setAllowCredentials(true); // Crucial for sending/receiving cookies across origins
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie")); // Expose these headers to the client
-        configuration.setMaxAge(3600L); // Cache pre-flight requests for 1 hour
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cookie", "X-Requested-With"));
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration); // Apply CORS to all paths
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless API (JWT)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS with custom configuration
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authorize -> authorize
-                        // Public endpoints that do NOT require authentication
+                        // Public endpoints
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
-                                "/api/h2-console/**" // H2 console for development
-                        ).permitAll() // Permit all access to the above paths
-                        .requestMatchers("/api/cart/**").authenticated() // Cart operations require authentication
-
-                        // Specific rules for /api/products endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll() // ONLY GET for /api/products is public
-                        .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll() // GET /api/products/{id} should be public for single product view
-                        .requestMatchers(HttpMethod.POST, "/api/products").authenticated() // POST /api/products requires authentication
-                        .requestMatchers(HttpMethod.PUT, "/api/products/**").authenticated() // PUT /api/products/{id} requires authentication
-                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").authenticated() // DELETE /api/products/{id} requires authentication
-
-                        // All other requests not explicitly permitted above require authentication
+                                "/api/h2-console/**"
+                        ).permitAll()
+                        .requestMatchers("/api/cart/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/products").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/products/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Use stateless sessions for JWT
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authenticationProvider(authenticationProvider()) // Configure custom authentication provider
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class) // Add JWT filter before Spring Security's default filter
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin())); // Allow H2 console to be in an iframe
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
 
         return http.build();
     }

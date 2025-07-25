@@ -1,7 +1,7 @@
-package com.example.handPick.repository; // UPDATED
+package com.example.handPick.repository;
 
-import com.example.handPick.model.CartItem; // UPDATED
-import com.example.handPick.model.Cart; // UPDATED
+import com.example.handPick.model.CartItem;
+import com.example.handPick.model.Cart;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

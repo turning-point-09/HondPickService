@@ -4,6 +4,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -11,11 +13,9 @@ public class CartItemDto {
     private Long id;
     private Long productId;
     private String productName;
-    private Double unitPrice; // Using Double for frontend display, BigDecimal for backend calculations
+    private BigDecimal unitPrice;   // Use BigDecimal for price accuracy
     private Integer quantity;
-    private Double subtotal;  // Calculated (unitPrice * quantity)
+    private BigDecimal subtotal;    // Calculated (unitPrice * quantity)
     private String imageUrl;
-
-    // New: Selected size/unit for the product
-    private String size;
+    private String size;            // Selected size/unit for the product
 }

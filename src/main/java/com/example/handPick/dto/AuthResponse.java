@@ -1,4 +1,4 @@
-package com.example.handPick.dto; // UPDATED
+package com.example.handPick.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

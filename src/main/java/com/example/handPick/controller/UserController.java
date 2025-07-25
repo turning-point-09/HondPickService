@@ -1,6 +1,7 @@
 package com.example.handPick.controller;
 
 import com.example.handPick.dto.AddressDto;
+import com.example.handPick.dto.UserProfileResponse;
 import com.example.handPick.model.User;
 import com.example.handPick.service.UserService;
 import jakarta.validation.Valid;
@@ -9,15 +10,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
-
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/user")
 @CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 public class UserController {
 
@@ -27,23 +25,19 @@ public class UserController {
     private UserService userService;
 
     /**
-     * Endpoint to get the ID of the currently authenticated user.
-     * This is needed by the frontend because the JWT token is HttpOnly.
      * GET /api/users/me/id
-     * @param userDetails The authenticated user's details provided by Spring Security.
-     * @return ResponseEntity with the user's ID if authenticated, or 401 Unauthorized.
+     * Get the ID of the currently authenticated user.
      */
-//    @PreAuthorize("isAuthenticated()") // Ensure only authenticated users can access this
     @GetMapping("/me/id")
     public ResponseEntity<Long> getCurrentUserId(@AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
-            logger.warn("Unauthorized access attempt to /me/id: No user details. {}",userDetails);
+            logger.warn("Unauthorized access attempt to /me/id: No user details.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            User currentUser = userService.findByUsername(userDetails.getUsername())
+            User currentUser = userService.findByMobileNumber(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found for authenticated principal."));
-            logger.info("Fetched user ID {} for user {}", currentUser.getId(), currentUser.getUsername());
+            logger.info("Fetched user ID {} for user {}", currentUser.getId(), currentUser.getMobileNumber());
             return ResponseEntity.ok(currentUser.getId());
         } catch (Exception e) {
             logger.error("Error fetching user ID for {}: {}", userDetails.getUsername(), e.getMessage());
@@ -52,12 +46,9 @@ public class UserController {
     }
 
     /**
-     * Endpoint to get the shipping address of the currently authenticated user.
      * GET /api/users/me/address
-     * @param userDetails The authenticated user's details.
-     * @return ResponseEntity with AddressDto if found, or 204 No Content if no address.
+     * Get the shipping address of the currently authenticated user.
      */
-//    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me/address")
     public ResponseEntity<AddressDto> getCurrentUserAddress(@AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
@@ -65,7 +56,7 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            User currentUser = userService.findByUsername(userDetails.getUsername())
+            User currentUser = userService.findByMobileNumber(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found for authenticated principal."));
 
             if (currentUser.getAddress() != null) {
@@ -77,11 +68,11 @@ public class UserController {
                         currentUser.getAddress().getPostalCode(),
                         currentUser.getAddress().getCountry()
                 );
-                logger.info("Fetched address for user {}", currentUser.getUsername());
+                logger.info("Fetched address for user {}", currentUser.getMobileNumber());
                 return ResponseEntity.ok(addressDto);
             } else {
-                logger.info("No address found for user {}", currentUser.getUsername());
-                return ResponseEntity.noContent().build(); // 204 No Content if no address
+                logger.info("No address found for user {}", currentUser.getMobileNumber());
+                return ResponseEntity.noContent().build();
             }
         } catch (Exception e) {
             logger.error("Error fetching user address for {}: {}", userDetails.getUsername(), e.getMessage());
@@ -90,13 +81,9 @@ public class UserController {
     }
 
     /**
-     * Endpoint to update or create the shipping address for the currently authenticated user.
      * PUT /api/users/me/address
-     * @param userDetails The authenticated user's details.
-     * @param addressDto The AddressDto containing the new or updated address details.
-     * @return ResponseEntity with the updated AddressDto.
+     * Update or create the shipping address for the currently authenticated user.
      */
-//    @PreAuthorize("isAuthenticated()")
     @PutMapping("/me/address")
     public ResponseEntity<AddressDto> updateCurrentUserAddress(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -106,13 +93,11 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         try {
-            User currentUser = userService.findByUsername(userDetails.getUsername())
+            User currentUser = userService.findByMobileNumber(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found for authenticated principal."));
 
-            // Call the service method which returns an Address entity
             com.example.handPick.model.Address updatedAddressEntity = userService.updateOrCreateUserAddress(currentUser.getId(), addressDto);
 
-            // Convert the Address entity back to an AddressDto for the response
             AddressDto updatedAddressDto = new AddressDto(
                     updatedAddressEntity.getId(),
                     updatedAddressEntity.getStreet(),
@@ -122,11 +107,28 @@ public class UserController {
                     updatedAddressEntity.getCountry()
             );
 
-            logger.info("Address updated successfully for user {}", currentUser.getUsername());
+            logger.info("Address updated successfully for user {}", currentUser.getMobileNumber());
             return ResponseEntity.ok(updatedAddressDto);
         } catch (Exception e) {
             logger.error("Error updating user address for {}: {}", userDetails.getUsername(), e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
+        }
+        String mobileNumber = userDetails.getUsername();
+        return userService.findByMobileNumber(mobileNumber)
+                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(new UserProfileResponse(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getEmail(),
+                        user.getRole(),
+                        user.getMobileNumber()
+                )))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
     }
 }

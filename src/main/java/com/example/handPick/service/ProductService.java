@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 @Service
 public class ProductService {
 
@@ -71,13 +74,14 @@ public class ProductService {
         // Map fields from DTO to entity
         product.setName(productDto.getName());
         product.setDescription(productDto.getDescription());
-        // FIX: Directly assign BigDecimal values; no need for BigDecimal.valueOf()
-        product.setPrice(productDto.getPrice()); // Correct: productDto.getPrice() is already BigDecimal
+        product.setPrice(productDto.getPrice());
         product.setImageUrl(productDto.getImageUrl());
         product.setStockQuantity(productDto.getStockQuantity());
         product.setRating(productDto.getRating());
-        product.setOldPrice(productDto.getOldPrice()); // Correct: productDto.getOldPrice() is already BigDecimal
+        product.setOldPrice(productDto.getOldPrice());
+        product.setDiscountPercentage(productDto.getDiscountPercentage());
         product.setSizeOptions(productDto.getSizeOptions());
+        product.setCategory(productDto.getCategory());
 
         Product savedProduct = productRepository.save(product);
         return convertToDto(savedProduct);
@@ -110,11 +114,25 @@ public class ProductService {
         if (updateDto.getStockQuantity() != null) {
             product.setStockQuantity(updateDto.getStockQuantity());
         }
+        if (updateDto.getRating() != null) {
+            product.setRating(updateDto.getRating());
+        }
+        if (updateDto.getOldPrice() != null) {
+            product.setOldPrice(updateDto.getOldPrice());
+        }
+        if (updateDto.getDiscountPercentage() != null) {
+            product.setDiscountPercentage(updateDto.getDiscountPercentage());
+        }
+        if (updateDto.getSizeOptions() != null) {
+            product.setSizeOptions(updateDto.getSizeOptions());
+        }
+        if (updateDto.getCategory() != null) {
+            product.setCategory(updateDto.getCategory());
+        }
 
         Product updatedProduct = productRepository.save(product);
         return convertToDto(updatedProduct);
     }
-
 
     /**
      * Saves a Product entity directly. Used internally, e.g., by CartService for stock updates.
@@ -158,6 +176,7 @@ public class ProductService {
         dto.setSizeOptions(product.getSizeOptions());
         dto.setCreatedAt(product.getCreatedAt());
         dto.setUpdatedAt(product.getUpdatedAt());
+        dto.setCategory(product.getCategory());
         return dto;
     }
 
@@ -167,9 +186,16 @@ public class ProductService {
      * @return A list of matching ProductDto.
      */
     public List<ProductDto> searchProducts(String searchTerm) {
-        // The repository method takes the same searchTerm for both name and description
         return productRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm).stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
+    }
+
+    // In ProductService.java
+
+    public Page<ProductDto> searchProducts(String searchTerm, Pageable pageable) {
+        return productRepository
+                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm, pageable)
+                .map(this::convertToDto);
     }
 }

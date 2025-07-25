@@ -15,54 +15,50 @@ import java.util.Optional;
 @Service
 public class UserService {
 
+
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
-    private AddressRepository addressRepository; // Still needed for address management
-
-    // Removed: @Autowired private RoleRepository roleRepository;
+    private AddressRepository addressRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
 
     /**
-     * Registers a new user with provided details. Address, first name, last name, and mobile number are now optional.
-     * @param username The desired username.
+     * Registers a new user with provided details. Address, first name, last name, and email are optional.
+     * @param mobileNumber The user's mobile number (required, unique).
      * @param password The raw password.
-     * @param email The user's email.
+     * @param email The user's email (optional, unique if provided).
      * @param firstName The user's first name (optional).
      * @param lastName The user's last name (optional).
-     * @param mobileNumber The user's mobile number (optional).
      * @param street The street address (optional).
      * @param city The city (optional).
      * @param state The state (optional).
      * @param postalCode The postal code (optional).
      * @param country The country (optional).
      * @return The newly registered User entity.
-     * @throws RuntimeException if the username, email, or mobile number already exists.
+     * @throws RuntimeException if the mobile number or email already exists.
      */
     @Transactional
-    public User registerUser(String username, String password, String email,
-                             String firstName, String lastName, String mobileNumber,
+    public User registerUser(String mobileNumber, String password, String email,
+                             String firstName, String lastName,
                              String street, String city, String state, String postalCode, String country) {
-        if (userRepository.existsByUsername(username)) {
-            throw new RuntimeException("Username already exists!");
-        }
-        if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email already registered!");
-        }
-        if (mobileNumber != null && !mobileNumber.isEmpty() && userRepository.existsByMobileNumber(mobileNumber)) {
+        if (userRepository.existsByMobileNumber(mobileNumber)) {
             throw new RuntimeException("Mobile number already registered!");
+        }
+        if (email != null && !email.isEmpty() && userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email already registered!");
         }
 
         User newUser = new User();
-        newUser.setUsername(username);
-        newUser.setPassword(passwordEncoder.encode(password)); // Encode the password
+        newUser.setMobileNumber(mobileNumber);
+        newUser.setPassword(passwordEncoder.encode(password));
         newUser.setEmail(email);
         newUser.setFirstName(firstName);
         newUser.setLastName(lastName);
-        newUser.setMobileNumber(mobileNumber);
+        newUser.setRole("USER");
+        newUser.setUsername(mobileNumber); // or use email, or a new field
 
         // Handle optional Address
         if (street != null && !street.isEmpty() &&
@@ -76,22 +72,20 @@ public class UserService {
             newAddress.setState(state);
             newAddress.setPostalCode(postalCode);
             newAddress.setCountry(country);
-            newUser.setAddress(newAddress); // Set the address on the user
+            newAddress.setUser(newUser); // Ensure user_id is set
+            newUser.setAddress(newAddress);
         }
 
-        // Removed: Role assignment logic
-
-        // Save the user (Address will be cascaded and saved automatically if present)
         return userRepository.save(newUser);
     }
 
     /**
-     * Finds a user by username, eagerly fetching their address.
-     * @param username The username to search for.
+     * Finds a user by mobile number, eagerly fetching their address.
+     * @param mobileNumber The mobile number to search for.
      * @return An Optional containing the User if found.
      */
-    public Optional<User> findByUsername(String username) {
-        return userRepository.findByUsernameWithAddress(username);
+    public Optional<User> findByMobileNumber(String mobileNumber) {
+        return userRepository.findByMobileNumberWithAddress(mobileNumber);
     }
 
     /**
@@ -118,20 +112,17 @@ public class UserService {
 
         Address address = user.getAddress();
         if (address == null) {
-            // Create a new address if the user doesn't have one
             address = new Address();
-            user.setAddress(address); // Link the new address to the user
+            user.setAddress(address);
         }
 
-        // Update address fields from DTO
         address.setStreet(addressDto.getStreet());
         address.setCity(addressDto.getCity());
         address.setState(addressDto.getState());
         address.setPostalCode(addressDto.getPostalCode());
         address.setCountry(addressDto.getCountry());
 
-        // Save the user to cascade the address changes (or save address directly if not cascaded)
-        userRepository.save(user); // Saving user will cascade persist/update to address
+        userRepository.save(user);
         return address;
     }
 }

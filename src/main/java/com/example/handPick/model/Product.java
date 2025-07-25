@@ -37,11 +37,9 @@ public class Product {
     @Column(nullable = false)
     private Integer stockQuantity;
 
-    // Removed precision and scale for Double type, as they are not applicable.
     @Column
     private Double rating;
 
-    // Removed precision and scale for Double type, as they are not applicable.
     @Column
     private Double discountPercentage;
 
@@ -50,6 +48,9 @@ public class Product {
 
     @Column(length = 255)
     private String sizeOptions;
+
+    @Column(length = 50)
+    private String category; // e.g., organic, chemical, etc.
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -72,8 +73,8 @@ public class Product {
         if (this.oldPrice != null && this.price != null && this.oldPrice.compareTo(BigDecimal.ZERO) > 0) {
             if (this.price.compareTo(this.oldPrice) < 0) {
                 BigDecimal discount = this.oldPrice.subtract(this.price);
-                // Ensure scale is set for division result before converting to double
-                this.discountPercentage = discount.divide(this.oldPrice, 4, java.math.RoundingMode.HALF_UP)
+                this.discountPercentage = discount
+                        .divide(this.oldPrice, 4, java.math.RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100))
                         .doubleValue();
             } else {

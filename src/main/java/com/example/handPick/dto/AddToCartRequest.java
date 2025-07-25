@@ -17,6 +17,7 @@ public class AddToCartRequest {
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
 
-    // New: Selected size/unit for the product (e.g., "1kg", "1 pc")
-    private String size; // Optional, as not all products will have sizes
+    // Selected size/unit for the product (e.g., "1kg", "1 pc")
+    // Optional, as not all products will have sizes
+    private String size;
 }

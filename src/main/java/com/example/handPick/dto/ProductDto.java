@@ -36,14 +36,18 @@ public class ProductDto {
     @Min(value = 0, message = "Stock quantity cannot be negative")
     private Integer stockQuantity;
 
-    private Double rating; // Optional, validation handled by frontend/service
+    private Double rating; // Optional
 
     private BigDecimal oldPrice; // Optional
 
     private Double discountPercentage; // Optional, calculated by backend
 
-    // New: Size options (e.g., "1kg,0.5kg,1 pc,6 pc")
+    // Size options (e.g., "1kg,0.5kg,1 pc,6 pc")
     private String sizeOptions;
+
+    private String category;
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

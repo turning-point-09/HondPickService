@@ -1,7 +1,7 @@
-package com.example.handPick.repository; // UPDATED
+package com.example.handPick.repository;
 
-import com.example.handPick.model.RefreshToken; // UPDATED
-import com.example.handPick.model.User; // UPDATED
+import com.example.handPick.model.RefreshToken;
+import com.example.handPick.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 

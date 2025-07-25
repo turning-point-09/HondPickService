@@ -17,7 +17,7 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) // Corrected: Removed extra '= Fetch'
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
@@ -36,7 +36,7 @@ public class OrderItem {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal subtotal; // Calculated: unitPrice * quantity
 
-    // New: Stores the selected size/unit for the product in the order
-    @Column(length = 50, nullable = true) // Make nullable as not all products might have sizes
+    // Stores the selected size/unit for the product in the order
+    @Column(length = 50, nullable = true)
     private String size;
 }

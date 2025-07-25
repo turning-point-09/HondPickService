@@ -1,6 +1,5 @@
 package com.example.handPick.service;
 
-import com.example.handPick.controller.AuthController;
 import com.example.handPick.dto.AddToCartRequest;
 import com.example.handPick.dto.CartDto;
 import com.example.handPick.dto.CartItemDto;
@@ -64,10 +63,6 @@ public class CartService {
     /**
      * Retrieves the active cart for a given user.
      * If no active cart is found, a new one is created.
-     *
-     * @param user The authenticated user.
-     * @return A CartDto representing the active cart.
-     * @throws IllegalArgumentException if user is null.
      */
     @Transactional
     public CartDto getCart(User user, UUID guestId) {
@@ -80,12 +75,6 @@ public class CartService {
 
     /**
      * Adds an item to the cart for a user.
-     * Manages stock deduction and updates existing cart items or creates new ones.
-     *
-     * @param user The authenticated user.
-     * @param request AddToCartRequest containing product ID, quantity, and optional size.
-     * @return A CartDto representing the updated cart.
-     * @throws IllegalArgumentException if product is not found or stock is insufficient.
      */
     @Transactional
     public CartDto addItemToCart(User user, AddToCartRequest request) {
@@ -123,13 +112,13 @@ public class CartService {
             // Update quantity of existing item
             CartItem item = existing.get();
             item.setQuantity(newTotal);
-            item.setPrice(product.getPrice()); // Ensure price is updated to current product price
+            item.setPrice(product.getPrice());
             cartItemRepository.save(item);
         } else {
             // Add new item to cart
-            CartItem item = new CartItem(product, addQty, cart, request.getSize()); // Pass size to constructor
-            cart.getItems().add(item); // Add to cart's item list
-            cartItemRepository.save(item); // Explicitly save the new item
+            CartItem item = new CartItem(product, addQty, cart, request.getSize());
+            cart.getItems().add(item);
+            cartItemRepository.save(item);
         }
 
         // Deduct stock from the product
@@ -138,7 +127,6 @@ public class CartService {
             productService.saveProductEntity(product);
         }
 
-        // The @PreUpdate in Cart entity will handle updatedAt, but saving explicitly ensures changes are flushed.
         cartRepository.save(cart);
         return convertToDto(cart);
     }
@@ -146,12 +134,6 @@ public class CartService {
     /**
      * Updates the quantity of a specific item in the cart.
      * If quantity is 0 or less, the item is removed.
-     *
-     * @param user The authenticated user.
-     * @param productId The ID of the product to update.
-     * @param quantity The new quantity.
-     * @return A CartDto representing the updated cart.
-     * @throws IllegalArgumentException if the cart item is not found or stock is insufficient.
      */
     @Transactional
     public CartDto updateItemQuantity(User user, UUID guestId,
@@ -169,19 +151,17 @@ public class CartService {
 
         Product product = item.getProduct();
         int oldQty = item.getQuantity();
-        int diff = quantity - oldQty; // Difference in quantity (positive for increase, negative for decrease)
+        int diff = quantity - oldQty;
 
         if (quantity <= 0) {
-            // Remove item if new quantity is zero or less
-            cart.getItems().remove(item); // Remove from cart's item list
-            cartItemRepository.delete(item); // Delete the item from DB
+            cart.getItems().remove(item);
+            cartItemRepository.delete(item);
             if (product.getStockQuantity() != null) {
-                product.setStockQuantity(product.getStockQuantity() + oldQty); // Return old quantity to stock
+                product.setStockQuantity(product.getStockQuantity() + oldQty);
                 productService.saveProductEntity(product);
             }
         } else {
-            // Update quantity
-            if (diff > 0 // If quantity is increasing, check stock
+            if (diff > 0
                     && product.getStockQuantity() != null
                     && product.getStockQuantity() < diff) {
                 throw new IllegalArgumentException(
@@ -190,26 +170,20 @@ public class CartService {
                                 " more units available.");
             }
             item.setQuantity(quantity);
-            item.setPrice(product.getPrice()); // Ensure price is updated to current product price
-            cartItemRepository.save(item); // Save the updated item
+            item.setPrice(product.getPrice());
+            cartItemRepository.save(item);
             if (product.getStockQuantity() != null) {
-                product.setStockQuantity(product.getStockQuantity() - diff); // Adjust stock based on difference
+                product.setStockQuantity(product.getStockQuantity() - diff);
                 productService.saveProductEntity(product);
             }
         }
 
-        // The @PreUpdate in Cart entity will handle updatedAt, but saving explicitly ensures changes are flushed.
         cartRepository.save(cart);
         return convertToDto(cart);
     }
 
     /**
      * Removes a specific item from the cart.
-     *
-     * @param user The authenticated user.
-     * @param productId The ID of the product to remove.
-     * @return A CartDto representing the updated cart.
-     * @throws IllegalArgumentException if the product is not found in the cart.
      */
     @Transactional
     public CartDto removeItemFromCart(User user, UUID guestId, Long productId) {
@@ -225,65 +199,49 @@ public class CartService {
                         new IllegalArgumentException("Product not in cart: " + productId));
 
         Product product = item.getProduct();
-        cart.getItems().remove(item); // Remove from cart's item list
-        cartItemRepository.delete(item); // Delete the item from DB
+        cart.getItems().remove(item);
+        cartItemRepository.delete(item);
 
-        // Return stock to the product
         if (product.getStockQuantity() != null) {
             product.setStockQuantity(
                     product.getStockQuantity() + item.getQuantity());
             productService.saveProductEntity(product);
         }
 
-        // The @PreUpdate in Cart entity will handle updatedAt, but saving explicitly ensures changes are flushed.
         cartRepository.save(cart);
         return convertToDto(cart);
     }
 
     /**
      * Checks out the active cart for an authenticated user, creating an order.
-     * Handles optional shipping address update and stock deduction.
-     *
-     * @param initialUser The authenticated user.
-     * @param checkoutRequest CheckoutRequest containing payment method and optional shipping address.
-     * @return The created Order entity.
-     * @throws IllegalArgumentException if user is null, cart is empty, or stock is insufficient,
-     * or if shipping address is required but not provided/found.
      */
     @Transactional
     public Order checkoutCart(User initialUser, CheckoutRequest checkoutRequest) {
-        // Ensure user is authenticated
         if (initialUser == null) {
             throw new IllegalArgumentException(
                     "Authenticated user required for checkout.");
         }
 
-        // Fetch the user again to ensure latest address details are loaded if updated
         User userForOrder = userService.findById(initialUser.getId())
                 .orElseThrow(() -> new RuntimeException("User not found during checkout."));
 
-        // Update user's address if provided in checkout request
         if (checkoutRequest.getShippingAddress() != null) {
             userService.updateOrCreateUserAddress(userForOrder.getId(), checkoutRequest.getShippingAddress());
-            // Re-fetch user to get the newly updated/created address attached.
             userForOrder = userService.findById(userForOrder.getId())
                     .orElseThrow(() -> new RuntimeException("User not found after address update."));
         }
 
-        // Get the active cart for the user
         Cart activeCart = cartRepository
                 .findByUserAndStatus(userForOrder, Cart.CartStatus.ACTIVE)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "No active cart for user, or cart is not in ACTIVE status."));
 
-        // Ensure cart is not empty
         if (activeCart.getItems().isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot checkout an empty cart.");
         }
 
-        // Validate shipping address presence and create a snapshot for the order
         ShippingAddress orderShippingAddress = new ShippingAddress();
         if (userForOrder.getAddress() != null) {
             orderShippingAddress.setStreet(userForOrder.getAddress().getStreet());
@@ -291,25 +249,20 @@ public class CartService {
             orderShippingAddress.setState(userForOrder.getAddress().getState());
             orderShippingAddress.setPostalCode(userForOrder.getAddress().getPostalCode());
             orderShippingAddress.setCountry(userForOrder.getAddress().getCountry());
-//            orderShippingAddress.setLandmark(userForOrder.getAddress().getLandmark());
-//            orderShippingAddress.setPhoneNumber(userForOrder.getAddress().getPhoneNumber());
         } else {
             throw new IllegalArgumentException("Shipping address is required for checkout but not found for user.");
         }
 
-        // Calculate final totals for the order, including GST
         BigDecimal subtotalBeforeTax = activeCart.getTotalPrice();
         BigDecimal gstAmount = subtotalBeforeTax.multiply(BigDecimal.valueOf(gstRate)).setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalAmount = subtotalBeforeTax.add(gstAmount);
 
-        // Create the Order entity
         Order order = new Order();
         order.setUser(userForOrder);
         order.setTotalAmount(totalAmount);
         order.setPaymentMethod(checkoutRequest.getPaymentMethod());
         order.setShippingAddress(orderShippingAddress);
 
-        // Simulate payment status based on method
         if (checkoutRequest.getPaymentMethod() == Order.PaymentMethod.COD) {
             order.setPaymentStatus(Order.PaymentStatus.PENDING);
             order.setStatus(Order.OrderStatus.PENDING);
@@ -322,7 +275,6 @@ public class CartService {
         order.setOrderDate(LocalDateTime.now());
         order = orderRepository.save(order);
 
-        // Process cart items into order items and deduct stock
         for (CartItem cartItem : new ArrayList<>(activeCart.getItems())) {
             Product product = cartItem.getProduct();
             if (product.getStockQuantity() == null
@@ -332,7 +284,6 @@ public class CartService {
                                 product.getName() + ". Available: " + product.getStockQuantity() + ", Requested: " + cartItem.getQuantity());
             }
 
-            // Build snapshot OrderItem
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProductId(product.getId());
@@ -347,7 +298,6 @@ public class CartService {
             );
             orderItemRepository.save(orderItem);
 
-            // Deduct stock & remove cart item
             product.setStockQuantity(
                     product.getStockQuantity() - cartItem.getQuantity()
             );
@@ -358,55 +308,31 @@ public class CartService {
         }
 
         activeCart.setStatus(Cart.CartStatus.ORDERED);
-        activeCart.setUser(userForOrder); // Ensure user is explicitly set if it was a guest cart being checked out by a logged-in user
-        // The @PreUpdate in Cart entity will handle updatedAt, but saving explicitly ensures changes are flushed.
+        activeCart.setUser(userForOrder);
         cartRepository.save(activeCart);
         return order;
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────
 
-    /**
-     * Retrieves an active cart entity for the given user, or creates a new one.
-     * This method is used internally by other service methods to ensure they always operate on an active cart.
-     *
-     * @param user The authenticated user.
-     * @return An active Cart entity.
-     * @throws IllegalArgumentException if user is null.
-     */
     private Cart getCartEntityForAddOrUpdate(User user) {
         if (user != null && user.getId() != null) {
-            // 1. Try to find an existing ACTIVE cart for the user
             return cartRepository.findByUserAndStatus(user, Cart.CartStatus.ACTIVE)
                     .orElseGet(() -> createNewCartForUser(user));
         } else {
-            // Critical: If neither user nor guestId is provided, we cannot identify the cart.
             throw new IllegalArgumentException("Cannot get or create cart: A user ID must be provided.");
         }
     }
 
-    /**
-     * Creates and saves a new active cart for a user.
-     *
-     * @param user The user for whom to create the cart.
-     * @return The newly created Cart entity.
-     */
     @Transactional
     private Cart createNewCartForUser(User user) {
         Cart cart = new Cart();
         cart.setUser(user);
         cart.setStatus(Cart.CartStatus.ACTIVE);
         logger.info("Creating new cart for user: {}", user.getId());
-        // createdAt and updatedAt handled by @PrePersist in Cart entity
         return cartRepository.save(cart);
     }
 
-    /**
-     * Converts a Cart entity to a CartDto, including GST breakdown.
-     *
-     * @param cart The Cart entity to convert.
-     * @return The CartDto with calculated totals and GST.
-     */
     private CartDto convertToDto(Cart cart) {
         List<CartItemDto> items = cart.getItems().stream()
                 .map(this::convertItemToDto)
@@ -428,23 +354,16 @@ public class CartService {
         );
     }
 
-    /**
-     * Converts a CartItem entity to a CartItemDto.
-     *
-     * @param item The CartItem entity to convert.
-     * @return The CartItemDto.
-     */
     private CartItemDto convertItemToDto(CartItem item) {
         CartItemDto dto = new CartItemDto();
         dto.setId(item.getId());
         dto.setProductId(item.getProduct().getId());
         dto.setProductName(item.getProduct().getName());
-        dto.setUnitPrice(item.getPrice().doubleValue());
+        dto.setUnitPrice(item.getPrice());
         dto.setQuantity(item.getQuantity());
         dto.setSubtotal(
                 item.getPrice()
                         .multiply(BigDecimal.valueOf(item.getQuantity()))
-                        .doubleValue()
         );
         dto.setImageUrl(item.getProduct().getImageUrl());
         dto.setSize(item.getSize());

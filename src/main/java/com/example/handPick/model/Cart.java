@@ -10,27 +10,23 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "carts")
-@Data // Provides getters, setters, equals, hashCode, toString
+@Data
 @NoArgsConstructor
-@AllArgsConstructor // Keep for constructor with all fields if needed elsewhere
+@AllArgsConstructor
 public class Cart {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id",unique = false)
+    @JoinColumn(name = "user_id", unique = false)
     private User user;
 
-    // Using EAGER fetch for items for simplicity in current CartService logic.
-    // For large applications, consider LAZY loading and fetch joins to optimize performance
-    // (e.g., using @EntityGraph or specific JPQL/Criteria queries).
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    private List<CartItem> items = new ArrayList<>(); // Initialize to prevent NullPointerException
+    private List<CartItem> items = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -41,10 +37,6 @@ public class Cart {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    // --- Dynamic Calculation Methods (NO @Column ANNOTATIONS HERE) ---
-    // These methods calculate totals on the fly, ensuring consistency with cart items
-    // and avoiding database default value issues.
 
     /**
      * Calculates the total price of all items in the cart.
@@ -57,7 +49,7 @@ public class Cart {
         return items.stream()
                 .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP); // Ensure consistent rounding for total
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -84,7 +76,6 @@ public class Cart {
         updatedAt = LocalDateTime.now();
     }
 
-    // Enum for cart status
     public enum CartStatus {
         ACTIVE, ORDERED, ABANDONED
     }

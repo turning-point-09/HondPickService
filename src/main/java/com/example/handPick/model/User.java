@@ -15,33 +15,32 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String username;
+    // Mobile number is the unique identifier for login
+    @Column(nullable = false, unique = true, length = 15)
+    private String mobileNumber;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, unique = true)
+    // Email is optional, can be unique if you want to enforce it
+    @Column(nullable = true, unique = true)
     private String email;
 
-    // New: First Name and Last Name
-    @Column(nullable = true, length = 50)
+    @Column(nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(length = 50)
     private String firstName;
 
-    @Column(nullable = true, length = 50)
+    @Column(length = 50)
     private String lastName;
 
-    // New: Mobile Number
-    @Column(nullable = true, unique = true, length = 15)
-    private String mobileNumber;
-
-    // One-to-one relationship with Address
-    // CascadeType.ALL ensures Address is saved/deleted with User
-    // orphanRemoval = true ensures Address is deleted if its User reference is nullified
-    // Address is now optional during registration, so it can be null.
+    // One-to-one relationship with Address (optional)
     @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JoinColumn(name = "address_id", referencedColumnName = "id")
     private Address address; // User's primary address
 
-    // Removed: Set<Role> roles field as per your instruction "i donot want role"
+    // No roles field as per your instruction
+    @Column(nullable = false)
+    private String role; // e.g., "ADMIN" or "USER"
 }

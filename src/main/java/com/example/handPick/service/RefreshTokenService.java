@@ -1,10 +1,10 @@
-package com.example.handPick.service; // UPDATED
+package com.example.handPick.service;
 
-import com.example.handPick.config.JwtUtil; // UPDATED
-import com.example.handPick.model.RefreshToken; // UPDATED
-import com.example.handPick.model.User; // UPDATED
-import com.example.handPick.repository.RefreshTokenRepository; // UPDATED
-import com.example.handPick.repository.UserRepository; // UPDATED
+import com.example.handPick.config.JwtUtil;
+import com.example.handPick.model.RefreshToken;
+import com.example.handPick.model.User;
+import com.example.handPick.repository.RefreshTokenRepository;
+import com.example.handPick.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,7 @@ public class RefreshTokenService {
     private UserRepository userRepository;
 
     @Autowired
-    private JwtUtil jwtUtil; // Although not directly used for generating refresh token content, good to have reference
+    private JwtUtil jwtUtil; // Not directly used, but available if needed
 
     @Value("${jwt.refresh.expiration}")
     private long refreshTokenExpirationMs;
@@ -38,13 +38,13 @@ public class RefreshTokenService {
         Optional<RefreshToken> existingToken = refreshTokenRepository.findByUser(user);
         if (existingToken.isPresent()) {
             RefreshToken token = existingToken.get();
-            token.setToken(UUID.randomUUID().toString()); // Generate a new UUID for the refresh token
+            token.setToken(UUID.randomUUID().toString());
             token.setExpiryDate(Instant.now().plusMillis(refreshTokenExpirationMs));
             return refreshTokenRepository.save(token);
         } else {
             RefreshToken refreshToken = new RefreshToken();
             refreshToken.setUser(user);
-            refreshToken.setToken(UUID.randomUUID().toString()); // Generate a random UUID as the refresh token value
+            refreshToken.setToken(UUID.randomUUID().toString());
             refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenExpirationMs));
             return refreshTokenRepository.save(refreshToken);
         }

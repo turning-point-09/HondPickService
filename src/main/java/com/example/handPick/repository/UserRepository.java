@@ -9,24 +9,16 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByUsername(String username);
-    boolean existsByUsername(String username);
-    boolean existsByEmail(String email); // New: Check if email exists
-    boolean existsByMobileNumber(String mobileNumber); // New: Check if mobile number exists
+    Optional<User> findByMobileNumber(String mobileNumber);
+    boolean existsByMobileNumber(String mobileNumber);
+    boolean existsByEmail(String email);
+    Optional<User> findByEmail(String email);
 
     // Fetch user with their address eagerly by ID
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.address WHERE u.id = :id")
     Optional<User> findByIdWithAddress(Long id);
 
-    // Fetch user with their address eagerly by username
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.address WHERE u.username = :username")
-    Optional<User> findByUsernameWithAddress(String username);
-
-    // Fetch user with their address and mobile number eagerly by ID (if needed for profile)
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.address WHERE u.id = :id")
-    Optional<User> findByIdWithAddressAndMobileNumber(Long id);
-
-    // Fetch user with their address and mobile number eagerly by username (if needed for profile)
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.address WHERE u.username = :username")
-    Optional<User> findByUsernameWithAddressAndMobileNumber(String username);
+    // Fetch user with their address eagerly by mobile number
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.address WHERE u.mobileNumber = :mobileNumber")
+    Optional<User> findByMobileNumberWithAddress(String mobileNumber);
 }

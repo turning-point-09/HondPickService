@@ -1,4 +1,4 @@
-package com.example.handPick.model; // Ensure this is correct
+package com.example.handPick.model;
 
 import jakarta.persistence.*;
 import lombok.Data;

@@ -27,25 +27,24 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
-    @Column(nullable = false, precision = 19, scale = 2) // Precision for currency
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderStatus status = OrderStatus.PENDING; // PENDING, COMPLETED, CANCELLED, SHIPPED, DELIVERED
+    private OrderStatus status = OrderStatus.PENDING;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = true) // Nullable until payment is selected/processed
-    private PaymentMethod paymentMethod; // COD, GPAY, PHONEPE
+    @Column(nullable = true)
+    private PaymentMethod paymentMethod;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = true) // Nullable until payment is processed
-    private PaymentStatus paymentStatus; // PENDING, COMPLETED, FAILED
+    @Column(nullable = true)
+    private PaymentStatus paymentStatus;
 
-    @Column(nullable = true, length = 255) // Store transaction ID from payment gateway
+    @Column(nullable = true, length = 255)
     private String transactionId;
 
-    // New: Embeddable ShippingAddress
     @Embedded
     private ShippingAddress shippingAddress;
 
@@ -54,11 +53,10 @@ public class Order {
     @PrePersist
     protected void onCreate() {
         orderDate = LocalDateTime.now();
-        // Set initial payment status if COD is chosen, otherwise PENDING
         if (this.paymentMethod == PaymentMethod.COD) {
-            this.paymentStatus = PaymentStatus.PENDING; // COD is pending until delivery
+            this.paymentStatus = PaymentStatus.PENDING;
         } else if (this.paymentMethod != null) {
-            this.paymentStatus = PaymentStatus.PENDING; // For digital payments, it's pending until confirmed
+            this.paymentStatus = PaymentStatus.PENDING;
         }
     }
 
@@ -67,9 +65,9 @@ public class Order {
     }
 
     public enum PaymentMethod {
-        COD, // Cash on Delivery
-        GPAY, // Google Pay
-        PHONEPE // PhonePe
+        COD,      // Cash on Delivery
+        GPAY,     // Google Pay
+        PHONEPE   // PhonePe
     }
 
     public enum PaymentStatus {
@@ -78,4 +76,10 @@ public class Order {
         FAILED,
         REFUNDED // Optional: if you want to track refunds
     }
+
+    @Column(length = 1000)
+    private String feedbackComments;
+
+    @Column
+    private Boolean feedbackOnTime;
 }

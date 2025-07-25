@@ -10,26 +10,19 @@ import com.example.handPick.model.Order;
 import com.example.handPick.model.User;
 import com.example.handPick.service.CartService;
 import com.example.handPick.service.UserService;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders; // Import HttpHeaders for setting cookies properly
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie; // Import ResponseCookie for better cookie management
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
+import java.util.Collections;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -53,12 +46,13 @@ public class CartController {
     /**
      * Retrieves the current user's shopping cart.
      * GET /api/cart
-     * @param userDetails Authenticated user details (if logged in).
-     * @return ResponseEntity with CartDto.
      */
     @GetMapping
     public ResponseEntity<CartDto> getCart(@AuthenticationPrincipal UserDetails userDetails) {
-        User currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -67,18 +61,35 @@ public class CartController {
     }
 
     /**
+     * Retrieves the current user's shopping cart item count.
+     * GET /api/cart/count
+     */
+    @GetMapping("/count")
+    public ResponseEntity<Integer> getCartItemCount(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        CartDto cart = cartService.getCart(currentUser, null);
+        return ResponseEntity.ok(cart.getTotalItems());
+    }
+
+    /**
      * Adds an item to the current user's cart.
      * POST /api/cart/add
-     * @param reqDto AddToCartRequest containing productId and quantity.
-     * @param userDetails Authenticated user details (if logged in).
-     * @return ResponseEntity with updated CartDto.
      */
     @PostMapping("/add")
     public ResponseEntity<CartDto> addItemToCart(
-            @Valid @RequestBody AddToCartRequest reqDto, // @Valid for DTO validation
+            @Valid @RequestBody AddToCartRequest reqDto,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        User currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -89,7 +100,6 @@ public class CartController {
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException ex) {
             logger.error("Failed to add item to cart: {}", ex.getMessage());
-            // Return a CartDto with error message for frontend consumption
             CartDto error = new CartDto(
                     null, Collections.emptyList(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null, ex.getMessage()
             );
@@ -106,18 +116,17 @@ public class CartController {
     /**
      * Updates the quantity of an item in the current user's cart.
      * PUT /api/cart/item/{productId}
-     * @param productId The ID of the product to update.
-     * @param reqDto QuantityUpdateRequest containing the new quantity.
-     * @param userDetails Authenticated user details (if logged in).
-     * @return ResponseEntity with updated CartDto.
      */
     @PutMapping("/item/{productId}")
     public ResponseEntity<CartDto> updateItemQuantity(
             @PathVariable Long productId,
-            @Valid @RequestBody QuantityUpdateRequest reqDto, // @Valid for DTO validation
+            @Valid @RequestBody QuantityUpdateRequest reqDto,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        User currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -145,16 +154,16 @@ public class CartController {
     /**
      * Removes an item from the current user's cart.
      * DELETE /api/cart/item/{productId}
-     * @param productId The ID of the product to remove.
-     * @param userDetails Authenticated user details (if logged in).
-     * @return ResponseEntity with updated CartDto.
      */
     @DeleteMapping("/item/{productId}")
     public ResponseEntity<CartDto> removeItem(
             @PathVariable Long productId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        User currentUser = userService.findByUsername(userDetails.getUsername()).orElse(null);
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -181,20 +190,15 @@ public class CartController {
 
     /**
      * Handles the checkout process for an authenticated user.
-     * Requires authentication.
      * POST /api/cart/checkout
-     * @param userDetails Authenticated user details.
-     * @param checkoutRequest CheckoutRequest containing the chosen payment method and optional shipping address.
-     * @return ResponseEntity with CheckoutResponse indicating order status.
      */
-    @PreAuthorize("isAuthenticated()") // Only authenticated users can checkout
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/checkout")
     public ResponseEntity<CheckoutResponse> checkoutCart(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody CheckoutRequest checkoutRequest) {
 
         if (userDetails == null) {
-            // This case should ideally be caught by @PreAuthorize, but good to have a fallback.
             logger.warn("Unauthorized checkout attempt: No user details.");
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
@@ -203,7 +207,7 @@ public class CartController {
 
         try {
             User currentUser = userService
-                    .findByUsername(userDetails.getUsername())
+                    .findByMobileNumber(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found after authentication."));
 
             Order newOrder = cartService.checkoutCart(currentUser, checkoutRequest);
@@ -213,7 +217,7 @@ public class CartController {
                     true
             );
             logger.info("Order {} placed successfully for user {}. Payment Method: {}, Status: {}",
-                    newOrder.getId(), currentUser.getUsername(), newOrder.getPaymentMethod(), newOrder.getPaymentStatus());
+                    newOrder.getId(), currentUser.getMobileNumber(), newOrder.getPaymentMethod(), newOrder.getPaymentStatus());
             return ResponseEntity.ok(resp);
 
         } catch (IllegalArgumentException ex) {
