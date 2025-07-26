@@ -310,6 +310,12 @@ public class UserService {
             BigDecimal totalRevenue = orderRepository.calculateTotalRevenue();
             stats.setTotalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO);
             
+            // Calculate profit
+            BigDecimal monthlyProfit = orderRepository.calculateMonthlyProfit(firstDayOfMonthStart, endOfMonth);
+            BigDecimal totalProfit = orderRepository.calculateTotalProfit();
+            stats.setMonthlyProfit(monthlyProfit != null ? monthlyProfit : BigDecimal.ZERO);
+            stats.setTotalProfit(totalProfit != null ? totalProfit : BigDecimal.ZERO);
+            
             // Calculate order statistics
             long monthlyPendingOrders = orderRepository.countPendingOrdersForMonth(firstDayOfMonthStart, endOfMonth);
             long monthlyDeliveredOrders = orderRepository.countDeliveredOrdersForMonth(firstDayOfMonthStart, endOfMonth);
@@ -326,6 +332,8 @@ public class UserService {
             System.err.println("Error calculating revenue and order stats: " + e.getMessage());
             stats.setMonthlyRevenue(BigDecimal.ZERO);
             stats.setTotalRevenue(BigDecimal.ZERO);
+            stats.setMonthlyProfit(BigDecimal.ZERO);
+            stats.setTotalProfit(BigDecimal.ZERO);
             stats.setMonthlyPendingOrders(0);
             stats.setMonthlyDeliveredOrders(0);
             stats.setTotalPendingOrders(0);

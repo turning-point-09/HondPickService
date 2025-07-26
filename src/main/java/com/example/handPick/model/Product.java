@@ -31,6 +31,10 @@ public class Product {
     @Min(value = 0, message = "Price cannot be negative")
     private BigDecimal price;
 
+    @Column(precision = 19, scale = 2)
+    @Min(value = 0, message = "Purchase price cannot be negative")
+    private BigDecimal purchasePrice; // Internal use for profit calculation
+
     @Column(length = 255)
     private String imageUrl;
 

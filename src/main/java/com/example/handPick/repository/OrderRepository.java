@@ -41,4 +41,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // Count total pending orders
     @Query("SELECT COUNT(o) FROM Order o WHERE o.status = 'PENDING'")
     long countTotalPendingOrders();
+
+    // Calculate monthly profit from delivered orders
+    @Query("SELECT COALESCE(SUM(oi.subtotal - (oi.unitPrice * oi.quantity * (SELECT p.purchasePrice FROM Product p WHERE p.id = oi.productId) / p.price)), 0) FROM Order o JOIN o.items oi JOIN Product p ON p.id = oi.productId WHERE o.status = 'DELIVERED' AND o.orderDate >= :startDate AND o.orderDate < :endDate")
+    BigDecimal calculateMonthlyProfit(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+    
+    // Calculate total profit from all delivered orders
+    @Query("SELECT COALESCE(SUM(oi.subtotal - (oi.unitPrice * oi.quantity * (SELECT p.purchasePrice FROM Product p WHERE p.id = oi.productId) / p.price)), 0) FROM Order o JOIN o.items oi JOIN Product p ON p.id = oi.productId WHERE o.status = 'DELIVERED'")
+    BigDecimal calculateTotalProfit();
 }

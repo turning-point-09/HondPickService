@@ -13,6 +13,8 @@ public class UserStatsDto {
     private long newUsersThisMonth;
     private BigDecimal monthlyRevenue;
     private BigDecimal totalRevenue;
+    private BigDecimal monthlyProfit;
+    private BigDecimal totalProfit;
     // Order statistics
     private long monthlyPendingOrders;
     private long monthlyDeliveredOrders;

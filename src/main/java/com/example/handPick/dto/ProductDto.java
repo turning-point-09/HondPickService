@@ -30,6 +30,9 @@ public class ProductDto {
     @DecimalMin(value = "0.01", message = "Price must be positive")
     private BigDecimal price;
 
+    @DecimalMin(value = "0.0", message = "Purchase price cannot be negative")
+    private BigDecimal purchasePrice; // Internal use for profit calculation
+
     private String imageUrl;
 
     @NotNull(message = "Stock quantity is required")
