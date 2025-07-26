@@ -1,6 +1,7 @@
 package com.example.handPick.controller;
 
 import com.example.handPick.dto.AddressDto;
+import com.example.handPick.dto.UserDto;
 import com.example.handPick.dto.UserProfileResponse;
 import com.example.handPick.model.User;
 import com.example.handPick.service.UserService;
@@ -12,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -130,5 +133,39 @@ public class UserController {
                         user.getMobileNumber()
                 )))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
+    }
+
+    /**
+     * Allows a user to delete their own account (soft delete).
+     * @return Success message.
+     */
+    @DeleteMapping("/account")
+    public ResponseEntity<String> deleteOwnAccount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String mobileNumber = authentication.getName();
+        
+        // Find user by mobile number
+        User user = userService.findByMobileNumber(mobileNumber)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Delete the account (soft delete)
+        userService.deleteUserAccount(user.getId());
+        
+        return ResponseEntity.ok("Account deleted successfully");
+    }
+
+    /**
+     * Gets the current user's profile information.
+     * @return User profile data.
+     */
+    @GetMapping("/profile")
+    public ResponseEntity<UserDto> getCurrentUserProfile() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String mobileNumber = authentication.getName();
+        
+        User user = userService.findByMobileNumber(mobileNumber)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        return ResponseEntity.ok(userService.convertToDto(user));
     }
 }

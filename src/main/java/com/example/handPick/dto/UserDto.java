@@ -8,6 +8,7 @@ public class UserDto {
     private String firstName;
     private String lastName;
     private String role;
+    private Boolean active;
     private AddressDto address;
 
     // Default constructor
@@ -15,7 +16,7 @@ public class UserDto {
 
     // Constructor with all fields
     public UserDto(Long id, String username, String email, String mobileNumber, 
-                   String firstName, String lastName, String role, AddressDto address) {
+                   String firstName, String lastName, String role, Boolean active, AddressDto address) {
         this.id = id;
         this.username = username;
         this.email = email;
@@ -23,6 +24,7 @@ public class UserDto {
         this.firstName = firstName;
         this.lastName = lastName;
         this.role = role;
+        this.active = active;
         this.address = address;
     }
 
@@ -81,6 +83,14 @@ public class UserDto {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 
     public AddressDto getAddress() {

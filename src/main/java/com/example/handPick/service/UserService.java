@@ -155,7 +155,7 @@ public class UserService {
      * @param user The User entity to convert.
      * @return The corresponding UserDto.
      */
-    private UserDto convertToDto(User user) {
+    public UserDto convertToDto(User user) {
         UserDto dto = new UserDto();
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
@@ -164,6 +164,7 @@ public class UserService {
         dto.setFirstName(user.getFirstName());
         dto.setLastName(user.getLastName());
         dto.setRole(user.getRole());
+        dto.setActive(user.getActive());
         
         // Convert address if it exists
         if (user.getAddress() != null) {
@@ -178,5 +179,65 @@ public class UserService {
         }
         
         return dto;
+    }
+
+    /**
+     * Activates a user account (admin only).
+     * @param userId The ID of the user to activate.
+     * @return The updated User entity.
+     * @throws RuntimeException if the user is not found.
+     */
+    @Transactional
+    public User activateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        user.setActive(true);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Deactivates a user account (admin only).
+     * @param userId The ID of the user to deactivate.
+     * @return The updated User entity.
+     * @throws RuntimeException if the user is not found.
+     */
+    @Transactional
+    public User deactivateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        user.setActive(false);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Allows a user to delete their own account (soft delete - sets active to false).
+     * @param userId The ID of the user deleting their account.
+     * @return The updated User entity.
+     * @throws RuntimeException if the user is not found.
+     */
+    @Transactional
+    public User deleteUserAccount(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+        user.setActive(false);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Gets all active users with pagination.
+     * @param pageable The pagination parameters.
+     * @return A Page of UserDto containing only active users.
+     */
+    public Page<UserDto> getActiveUsers(Pageable pageable) {
+        return userRepository.findByActiveTrue(pageable).map(this::convertToDto);
+    }
+
+    /**
+     * Gets all inactive users with pagination.
+     * @param pageable The pagination parameters.
+     * @return A Page of UserDto containing only inactive users.
+     */
+    public Page<UserDto> getInactiveUsers(Pageable pageable) {
+        return userRepository.findByActiveFalse(pageable).map(this::convertToDto);
     }
 }

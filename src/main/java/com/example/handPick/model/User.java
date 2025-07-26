@@ -43,4 +43,7 @@ public class User {
     // No roles field as per your instruction
     @Column(nullable = false)
     private String role; // e.g., "ADMIN" or "USER"
+
+    @Column(nullable = false)
+    private Boolean active = true; // User account status
 }

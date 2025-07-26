@@ -22,10 +22,19 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByMobileNumber(mobileNumber)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + mobileNumber));
 
+        // Check if user account is active
+        if (!user.getActive()) {
+            throw new UsernameNotFoundException("User account is deactivated: " + mobileNumber);
+        }
+
         // Spring Security requires roles to be prefixed with 'ROLE_' for hasRole('ADMIN') to work
         return new org.springframework.security.core.userdetails.User(
                 user.getMobileNumber(),
                 user.getPassword(),
+                user.getActive(), // enabled
+                true, // accountNonExpired
+                true, // credentialsNonExpired
+                true, // accountNonLocked
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
         );
     }
