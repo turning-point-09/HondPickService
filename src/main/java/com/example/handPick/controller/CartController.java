@@ -198,6 +198,13 @@ public class CartController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody CheckoutRequest checkoutRequest) {
 
+        logger.info("=== CHECKOUT DEBUG ===");
+        logger.info("User: {}", userDetails != null ? userDetails.getUsername() : "null");
+        logger.info("CheckoutRequest: paymentMethod={}, shippingAddress={}", 
+                   checkoutRequest != null ? checkoutRequest.getPaymentMethod() : "null",
+                   checkoutRequest != null ? checkoutRequest.getShippingAddress() : "null");
+        logger.info("=== END CHECKOUT DEBUG ===");
+
         if (userDetails == null) {
             logger.warn("Unauthorized checkout attempt: No user details.");
             return ResponseEntity

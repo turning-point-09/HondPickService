@@ -1,16 +1,21 @@
 package com.example.handPick.service;
 
 import com.example.handPick.dto.AddressDto;
+import com.example.handPick.dto.UserDto;
 import com.example.handPick.model.Address;
 import com.example.handPick.model.User;
 import com.example.handPick.repository.AddressRepository;
 import com.example.handPick.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -124,5 +129,54 @@ public class UserService {
 
         userRepository.save(user);
         return address;
+    }
+
+    /**
+     * Gets all users with pagination and converts them to DTOs.
+     * @param pageable The pagination parameters.
+     * @return A Page of UserDto.
+     */
+    public Page<UserDto> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::convertToDto);
+    }
+
+    /**
+     * Gets all users and converts them to DTOs.
+     * @return A list of UserDto.
+     */
+    public List<UserDto> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Converts a User entity to a UserDto.
+     * @param user The User entity to convert.
+     * @return The corresponding UserDto.
+     */
+    private UserDto convertToDto(User user) {
+        UserDto dto = new UserDto();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
+        dto.setMobileNumber(user.getMobileNumber());
+        dto.setFirstName(user.getFirstName());
+        dto.setLastName(user.getLastName());
+        dto.setRole(user.getRole());
+        
+        // Convert address if it exists
+        if (user.getAddress() != null) {
+            AddressDto addressDto = new AddressDto();
+            addressDto.setId(user.getAddress().getId());
+            addressDto.setStreet(user.getAddress().getStreet());
+            addressDto.setCity(user.getAddress().getCity());
+            addressDto.setState(user.getAddress().getState());
+            addressDto.setPostalCode(user.getAddress().getPostalCode());
+            addressDto.setCountry(user.getAddress().getCountry());
+            dto.setAddress(addressDto);
+        }
+        
+        return dto;
     }
 }
