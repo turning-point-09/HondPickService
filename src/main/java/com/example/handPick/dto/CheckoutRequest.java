@@ -14,6 +14,12 @@ public class CheckoutRequest {
     @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod; // COD, GPAY, PHONEPE
 
-    // New: Optional AddressDto for updating/providing shipping address at checkout
-    private AddressDto shippingAddress;
+    // Address selection options
+    private Long selectedAddressId; // ID of existing address to use
+    private AddressDto newAddress; // New address details if adding new address
+    
+    // Address saving options
+    private String addressLabel; // Label for the new address (e.g., "Home", "Office")
+    private String saveAddressAs; // "PERMANENT", "TEMPORARY", "ONE_TIME", or null for no saving
+    private boolean setAsDefault = false; // Whether to set as default address
 }

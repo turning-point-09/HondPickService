@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.example.handPick.service.UserAddressService;
 
 @Service
 public class CartService {
@@ -41,6 +42,7 @@ public class CartService {
     private final OrderItemRepository orderItemRepository;
     private final ProductService productService;
     private final UserService userService;
+    private final UserAddressService userAddressService;
 
     @Value("${app.gst.rate:0.18}")
     private double gstRate;
@@ -51,13 +53,15 @@ public class CartService {
                        OrderRepository orderRepository,
                        OrderItemRepository orderItemRepository,
                        ProductService productService,
-                       UserService userService) {
+                       UserService userService,
+                       UserAddressService userAddressService) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.productService = productService;
         this.userService = userService;
+        this.userAddressService = userAddressService;
     }
 
     /**
@@ -225,11 +229,8 @@ public class CartService {
         User userForOrder = userService.findById(initialUser.getId())
                 .orElseThrow(() -> new RuntimeException("User not found during checkout."));
 
-        if (checkoutRequest.getShippingAddress() != null) {
-            userService.updateOrCreateUserAddress(userForOrder.getId(), checkoutRequest.getShippingAddress());
-            userForOrder = userService.findById(userForOrder.getId())
-                    .orElseThrow(() -> new RuntimeException("User not found after address update."));
-        }
+        // Handle address selection and management
+        ShippingAddress orderShippingAddress = handleAddressForCheckout(userForOrder, checkoutRequest);
 
         Cart activeCart = cartRepository
                 .findByUserAndStatus(userForOrder, Cart.CartStatus.ACTIVE)
@@ -240,17 +241,6 @@ public class CartService {
         if (activeCart.getItems().isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot checkout an empty cart.");
-        }
-
-        ShippingAddress orderShippingAddress = new ShippingAddress();
-        if (userForOrder.getAddress() != null) {
-            orderShippingAddress.setStreet(userForOrder.getAddress().getStreet());
-            orderShippingAddress.setCity(userForOrder.getAddress().getCity());
-            orderShippingAddress.setState(userForOrder.getAddress().getState());
-            orderShippingAddress.setPostalCode(userForOrder.getAddress().getPostalCode());
-            orderShippingAddress.setCountry(userForOrder.getAddress().getCountry());
-        } else {
-            throw new IllegalArgumentException("Shipping address is required for checkout but not found for user.");
         }
 
         BigDecimal subtotalBeforeTax = activeCart.getTotalPrice();
@@ -311,6 +301,69 @@ public class CartService {
         activeCart.setUser(userForOrder);
         cartRepository.save(activeCart);
         return order;
+    }
+
+    /**
+     * Handle address selection and management during checkout
+     */
+    private ShippingAddress handleAddressForCheckout(User user, CheckoutRequest checkoutRequest) {
+        ShippingAddress orderShippingAddress = new ShippingAddress();
+
+        // If user selected an existing address
+        if (checkoutRequest.getSelectedAddressId() != null) {
+            com.example.handPick.dto.UserAddressDto selectedAddress = userAddressService.getAddressById(
+                    checkoutRequest.getSelectedAddressId(), user.getId());
+            
+            orderShippingAddress.setStreet(selectedAddress.getStreet());
+            orderShippingAddress.setCity(selectedAddress.getCity());
+            orderShippingAddress.setState(selectedAddress.getState());
+            orderShippingAddress.setPostalCode(selectedAddress.getPostalCode());
+            orderShippingAddress.setCountry(selectedAddress.getCountry());
+        }
+        // If user provided a new address
+        else if (checkoutRequest.getNewAddress() != null) {
+            com.example.handPick.dto.AddressDto newAddress = checkoutRequest.getNewAddress();
+            
+            orderShippingAddress.setStreet(newAddress.getStreet());
+            orderShippingAddress.setCity(newAddress.getCity());
+            orderShippingAddress.setState(newAddress.getState());
+            orderShippingAddress.setPostalCode(newAddress.getPostalCode());
+            orderShippingAddress.setCountry(newAddress.getCountry());
+
+            // Handle address saving based on user preference
+            if (checkoutRequest.getSaveAddressAs() != null && 
+                !checkoutRequest.getSaveAddressAs().equals("ONE_TIME")) {
+                
+                com.example.handPick.dto.UserAddressDto addressToSave = new com.example.handPick.dto.UserAddressDto();
+                addressToSave.setStreet(newAddress.getStreet());
+                addressToSave.setCity(newAddress.getCity());
+                addressToSave.setState(newAddress.getState());
+                addressToSave.setPostalCode(newAddress.getPostalCode());
+                addressToSave.setCountry(newAddress.getCountry());
+                addressToSave.setAddressLabel(checkoutRequest.getAddressLabel());
+                addressToSave.setAddressType(checkoutRequest.getSaveAddressAs());
+                addressToSave.setDefault(checkoutRequest.isSetAsDefault());
+
+                userAddressService.addAddress(user.getId(), addressToSave);
+                logger.info("Saved new address for user {} as {}", user.getId(), checkoutRequest.getSaveAddressAs());
+            }
+        }
+        // Use default address if available
+        else {
+            return userAddressService.getDefaultAddress(user.getId())
+                    .map(defaultAddress -> {
+                        ShippingAddress defaultShippingAddress = new ShippingAddress();
+                        defaultShippingAddress.setStreet(defaultAddress.getStreet());
+                        defaultShippingAddress.setCity(defaultAddress.getCity());
+                        defaultShippingAddress.setState(defaultAddress.getState());
+                        defaultShippingAddress.setPostalCode(defaultAddress.getPostalCode());
+                        defaultShippingAddress.setCountry(defaultAddress.getCountry());
+                        return defaultShippingAddress;
+                    })
+                    .orElseThrow(() -> new IllegalArgumentException("No shipping address provided and no default address found."));
+        }
+
+        return orderShippingAddress;
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────

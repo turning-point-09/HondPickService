@@ -10,6 +10,7 @@ import com.example.handPick.model.Order;
 import com.example.handPick.model.User;
 import com.example.handPick.service.CartService;
 import com.example.handPick.service.UserService;
+import com.example.handPick.service.UserAddressService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -33,14 +35,17 @@ public class CartController {
     private final CartService cartService;
     private final UserService userService;
     private final JwtUtil jwtUtil;
+    private final UserAddressService userAddressService;
 
     @Autowired
     public CartController(CartService cartService,
                           UserService userService,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil,
+                          UserAddressService userAddressService) {
         this.cartService = cartService;
         this.userService = userService;
         this.jwtUtil = jwtUtil;
+        this.userAddressService = userAddressService;
     }
 
     /**
@@ -189,6 +194,25 @@ public class CartController {
     }
 
     /**
+     * GET /api/cart/checkout/addresses
+     * Get available addresses for checkout
+     */
+    @GetMapping("/checkout/addresses")
+    public ResponseEntity<List<com.example.handPick.dto.UserAddressDto>> getCheckoutAddresses(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        User currentUser = userService.findByMobileNumber(userDetails.getUsername()).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        List<com.example.handPick.dto.UserAddressDto> addresses = userAddressService.getUserAddresses(currentUser.getId());
+        return ResponseEntity.ok(addresses);
+    }
+
+    /**
      * Handles the checkout process for an authenticated user.
      * POST /api/cart/checkout
      */
@@ -200,9 +224,10 @@ public class CartController {
 
         logger.info("=== CHECKOUT DEBUG ===");
         logger.info("User: {}", userDetails != null ? userDetails.getUsername() : "null");
-        logger.info("CheckoutRequest: paymentMethod={}, shippingAddress={}", 
+        logger.info("CheckoutRequest: paymentMethod={}, selectedAddressId={}, newAddress={}", 
                    checkoutRequest != null ? checkoutRequest.getPaymentMethod() : "null",
-                   checkoutRequest != null ? checkoutRequest.getShippingAddress() : "null");
+                   checkoutRequest != null ? checkoutRequest.getSelectedAddressId() : "null",
+                   checkoutRequest != null ? checkoutRequest.getNewAddress() : "null");
         logger.info("=== END CHECKOUT DEBUG ===");
 
         if (userDetails == null) {
@@ -215,28 +240,23 @@ public class CartController {
         try {
             User currentUser = userService
                     .findByMobileNumber(userDetails.getUsername())
-                    .orElseThrow(() -> new RuntimeException("User not found after authentication."));
+                    .orElseThrow(() -> new RuntimeException("User not found during checkout."));
 
-            Order newOrder = cartService.checkoutCart(currentUser, checkoutRequest);
-            CheckoutResponse resp = new CheckoutResponse(
-                    newOrder.getId(),
-                    "Order placed successfully! Payment Status: " + newOrder.getPaymentStatus().name(),
-                    true
-            );
-            logger.info("Order {} placed successfully for user {}. Payment Method: {}, Status: {}",
-                    newOrder.getId(), currentUser.getMobileNumber(), newOrder.getPaymentMethod(), newOrder.getPaymentStatus());
-            return ResponseEntity.ok(resp);
+            Order order = cartService.checkoutCart(currentUser, checkoutRequest);
+            logger.info("Checkout successful for user {}. Order ID: {}", currentUser.getMobileNumber(), order.getId());
+
+            return ResponseEntity.ok(new CheckoutResponse(order.getId(), "Order placed successfully!", true));
 
         } catch (IllegalArgumentException ex) {
-            logger.error("Checkout failed for user {}: {}", userDetails.getUsername(), ex.getMessage());
+            logger.error("Checkout failed due to invalid request: {}", ex.getMessage());
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body(new CheckoutResponse(null, ex.getMessage(), false));
         } catch (Exception ex) {
-            logger.error("Server error during checkout for user {}: {}", userDetails.getUsername(), ex.getMessage(), ex);
+            logger.error("Server error during checkout: {}", ex.getMessage(), ex);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new CheckoutResponse(null, "Checkout failed: " + ex.getMessage(), false));
+                    .body(new CheckoutResponse(null, "Server error during checkout", false));
         }
     }
 }
