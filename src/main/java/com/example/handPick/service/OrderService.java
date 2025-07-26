@@ -47,6 +47,11 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Order not found"));
     }
 
+    // Get all orders (paged) for admin
+    public Page<Order> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable);
+    }
+
     // Save feedback for an order
     @Transactional
     public void saveOrderFeedback(Long orderId, OrderFeedbackDto feedbackDto, String mobileNumber) {
@@ -60,6 +65,21 @@ public class OrderService {
         order.setFeedbackComments(feedbackDto.getComments());
         order.setFeedbackOnTime(feedbackDto.getOnTime());
         orderRepository.save(order);
+    }
+
+    // Update order status (admin only)
+    @Transactional
+    public Order updateOrderStatus(Long orderId, String status) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        
+        try {
+            Order.OrderStatus newStatus = Order.OrderStatus.valueOf(status.toUpperCase());
+            order.setStatus(newStatus);
+            return orderRepository.save(order);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid order status: " + status);
+        }
     }
 
     // Convert Order entity to OrderDto for clean API responses
