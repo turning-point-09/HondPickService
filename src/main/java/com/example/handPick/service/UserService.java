@@ -2,9 +2,13 @@ package com.example.handPick.service;
 
 import com.example.handPick.dto.AddressDto;
 import com.example.handPick.dto.UserDto;
+import com.example.handPick.dto.UserStatsDto;
 import com.example.handPick.model.Address;
 import com.example.handPick.model.User;
+import com.example.handPick.model.UserAddress;
 import com.example.handPick.repository.AddressRepository;
+import com.example.handPick.repository.OrderRepository;
+import com.example.handPick.repository.UserAddressRepository;
 import com.example.handPick.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -13,6 +17,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -29,6 +38,12 @@ public class UserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UserAddressRepository userAddressRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
 
     /**
      * Registers a new user with provided details. Address, first name, last name, and email are optional.
@@ -81,7 +96,28 @@ public class UserService {
             newUser.setAddress(newAddress);
         }
 
-        return userRepository.save(newUser);
+        User savedUser = userRepository.save(newUser);
+
+        // Also save as UserAddress for multi-address system
+        if (street != null && !street.isEmpty() &&
+                city != null && !city.isEmpty() &&
+                state != null && !state.isEmpty() &&
+                postalCode != null && !postalCode.isEmpty() &&
+                country != null && !country.isEmpty()) {
+            UserAddress userAddress = new UserAddress();
+            userAddress.setUser(savedUser);
+            userAddress.setStreet(street);
+            userAddress.setCity(city);
+            userAddress.setState(state);
+            userAddress.setPostalCode(postalCode);
+            userAddress.setCountry(country);
+            userAddress.setAddressLabel("Home");
+            userAddress.setAddressType(UserAddress.AddressType.PERMANENT);
+            userAddress.setDefault(true);
+            userAddressRepository.save(userAddress);
+        }
+
+        return savedUser;
     }
 
     /**
@@ -239,5 +275,71 @@ public class UserService {
      */
     public Page<UserDto> getInactiveUsers(Pageable pageable) {
         return userRepository.findByActiveFalse(pageable).map(this::convertToDto);
+    }
+
+    public UserStatsDto getUserStats() {
+        UserStatsDto stats = new UserStatsDto();
+        List<User> allUsers = userRepository.findAll();
+        
+        // Basic user counts
+        stats.setTotalUsers(allUsers.size());
+        stats.setActiveUsers(allUsers.stream().filter(User::getActive).count());
+        stats.setInactiveUsers(allUsers.stream().filter(u -> !u.getActive()).count());
+        stats.setSuspendedUsers(allUsers.stream().filter(u -> u.getRole().equalsIgnoreCase("SUSPENDED")).count());
+        
+        // Note: newUsersThisMonth calculation removed since User entity doesn't have createdAt field
+        // You can add this field to User entity if needed, or calculate based on registration date
+        stats.setNewUsersThisMonth(0); // Set to 0 for now
+        
+        // Calculate new users this month using createdAt field
+        LocalDate firstDayOfMonth = LocalDate.now().withDayOfMonth(1);
+        LocalDateTime firstDayOfMonthStart = firstDayOfMonth.atStartOfDay();
+        long newUsersThisMonth = allUsers.stream()
+            .filter(u -> u.getCreatedAt() != null && u.getCreatedAt().isAfter(firstDayOfMonthStart))
+            .count();
+        stats.setNewUsersThisMonth(newUsersThisMonth);
+        
+        try {
+            // Calculate monthly revenue
+            LocalDateTime endOfMonth = firstDayOfMonth.plusMonths(1).atStartOfDay();
+            
+            BigDecimal monthlyRevenue = orderRepository.calculateMonthlyRevenue(firstDayOfMonthStart, endOfMonth);
+            stats.setMonthlyRevenue(monthlyRevenue != null ? monthlyRevenue : BigDecimal.ZERO);
+            
+            // Calculate total revenue
+            BigDecimal totalRevenue = orderRepository.calculateTotalRevenue();
+            stats.setTotalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO);
+            
+            // Calculate order statistics
+            long monthlyPendingOrders = orderRepository.countPendingOrdersForMonth(firstDayOfMonthStart, endOfMonth);
+            long monthlyDeliveredOrders = orderRepository.countDeliveredOrdersForMonth(firstDayOfMonthStart, endOfMonth);
+            long totalPendingOrders = orderRepository.countTotalPendingOrders();
+            long totalDeliveredOrders = orderRepository.countTotalDeliveredOrders();
+            
+            stats.setMonthlyPendingOrders(monthlyPendingOrders);
+            stats.setMonthlyDeliveredOrders(monthlyDeliveredOrders);
+            stats.setTotalPendingOrders(totalPendingOrders);
+            stats.setTotalDeliveredOrders(totalDeliveredOrders);
+            
+        } catch (Exception e) {
+            // Log error and set revenue to zero if calculation fails
+            System.err.println("Error calculating revenue and order stats: " + e.getMessage());
+            stats.setMonthlyRevenue(BigDecimal.ZERO);
+            stats.setTotalRevenue(BigDecimal.ZERO);
+            stats.setMonthlyPendingOrders(0);
+            stats.setMonthlyDeliveredOrders(0);
+            stats.setTotalPendingOrders(0);
+            stats.setTotalDeliveredOrders(0);
+        }
+        
+        // Users by role
+        HashMap<String, Long> usersByRole = new HashMap<>();
+        allUsers.forEach(u -> {
+            String role = u.getRole();
+            usersByRole.put(role, usersByRole.getOrDefault(role, 0L) + 1);
+        });
+        stats.setUsersByRole(usersByRole);
+        
+        return stats;
     }
 }

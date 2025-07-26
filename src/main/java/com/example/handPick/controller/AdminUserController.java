@@ -2,6 +2,7 @@ package com.example.handPick.controller;
 
 import com.example.handPick.dto.UserDto;
 import com.example.handPick.dto.UserStatusDto;
+import com.example.handPick.dto.UserStatsDto;
 import com.example.handPick.model.User;
 import com.example.handPick.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +61,12 @@ public class AdminUserController {
         PageRequest pageRequest = PageRequest.of(page, size, sort);
         Page<UserDto> users = userService.getInactiveUsers(pageRequest);
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<UserStatsDto> getUserStats() {
+        UserStatsDto stats = userService.getUserStats();
+        return ResponseEntity.ok(stats);
     }
 
     @PutMapping("/{userId}/activate")
