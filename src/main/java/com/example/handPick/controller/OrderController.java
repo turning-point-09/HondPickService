@@ -25,23 +25,24 @@ public class OrderController {
 
     // Paginated order history for the logged-in user
     @GetMapping
-    public Page<Order> getOrderHistory(
-            @AuthenticationPrincipal UserDetails userDetails,
+    public Page<com.example.handPick.dto.OrderDto> getOrderHistory(
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        Pageable pageable = PageRequest.of(page, size);
-        return orderService.getOrdersForUser(userDetails.getUsername(), pageable);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        return orderService.getOrdersForUser(userDetails.getUsername(), pageable)
+                .map(orderService::convertToDto);
     }
 
     // Get a single order (detail view)
     @GetMapping("/{orderId}")
-    public ResponseEntity<Order> getOrderDetail(
+    public org.springframework.http.ResponseEntity<com.example.handPick.dto.OrderDto> getOrderDetail(
             @PathVariable Long orderId,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails
     ) {
-        Order order = orderService.getOrderByIdForUser(orderId, userDetails.getUsername());
-        return ResponseEntity.ok(order);
+        com.example.handPick.model.Order order = orderService.getOrderByIdForUser(orderId, userDetails.getUsername());
+        return org.springframework.http.ResponseEntity.ok(orderService.convertToDto(order));
     }
 
     // Download invoice as PDF

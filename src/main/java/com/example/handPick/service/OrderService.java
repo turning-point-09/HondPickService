@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 public class OrderService {
 
@@ -58,5 +60,43 @@ public class OrderService {
         order.setFeedbackComments(feedbackDto.getComments());
         order.setFeedbackOnTime(feedbackDto.getOnTime());
         orderRepository.save(order);
+    }
+
+    // Convert Order entity to OrderDto for clean API responses
+    public com.example.handPick.dto.OrderDto convertToDto(com.example.handPick.model.Order order) {
+        if (order == null) return null;
+        com.example.handPick.dto.OrderDto dto = new com.example.handPick.dto.OrderDto();
+        dto.setId(order.getId());
+        // Convert items
+        if (order.getItems() != null) {
+            List<com.example.handPick.dto.OrderItemDto> itemDtos = order.getItems().stream().map(item -> {
+                com.example.handPick.dto.OrderItemDto itemDto = new com.example.handPick.dto.OrderItemDto();
+                itemDto.setId(item.getId());
+                itemDto.setProductId(item.getProductId());
+                itemDto.setProductName(item.getProductName());
+                itemDto.setQuantity(item.getQuantity());
+                itemDto.setUnitPrice(item.getUnitPrice());
+                itemDto.setTotalPrice(item.getSubtotal());
+                return itemDto;
+            }).collect(java.util.stream.Collectors.toList());
+            dto.setItems(itemDtos);
+        }
+        dto.setTotalAmount(order.getTotalAmount());
+        dto.setStatus(order.getStatus() != null ? order.getStatus().name() : null);
+        dto.setPaymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null);
+        dto.setPaymentStatus(order.getPaymentStatus() != null ? order.getPaymentStatus().name() : null);
+        dto.setTransactionId(order.getTransactionId());
+        // Convert shipping address
+        if (order.getShippingAddress() != null) {
+            com.example.handPick.dto.AddressDto addressDto = new com.example.handPick.dto.AddressDto();
+            addressDto.setStreet(order.getShippingAddress().getStreet());
+            addressDto.setCity(order.getShippingAddress().getCity());
+            addressDto.setState(order.getShippingAddress().getState());
+            addressDto.setPostalCode(order.getShippingAddress().getPostalCode());
+            addressDto.setCountry(order.getShippingAddress().getCountry());
+            dto.setShippingAddress(addressDto);
+        }
+        dto.setOrderDate(order.getOrderDate());
+        return dto;
     }
 }
