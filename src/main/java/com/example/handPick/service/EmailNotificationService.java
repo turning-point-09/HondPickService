@@ -63,4 +63,24 @@ public class EmailNotificationService {
         
         sendAdminNotification(subject, message);
     }
+    
+    /**
+     * Send order cancellation notification via email
+     */
+    public void sendOrderCancellationEmail(String customerName, String customerMobile,
+                                          Long orderId, String totalAmount, String reason) {
+        String subject = "Order Cancelled #" + orderId + " - HandPick";
+        String message = String.format(
+            "❌ ORDER CANCELLATION ALERT!\n\n" +
+            "Order ID: %d\n" +
+            "Customer: %s (%s)\n" +
+            "Amount: ₹%s\n" +
+            "Reason: %s\n\n" +
+            "Please process the cancellation and refund if applicable.",
+            orderId, customerName, customerMobile, totalAmount, 
+            reason != null ? reason : "No reason provided"
+        );
+        
+        sendAdminNotification(subject, message);
+    }
 } 

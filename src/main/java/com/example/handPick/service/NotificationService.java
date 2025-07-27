@@ -135,6 +135,46 @@ public class NotificationService {
         return notificationRepository.countByIsReadFalse();
     }
     
+    /**
+     * Notify admin about order cancellation
+     */
+    @Transactional
+    public void notifyOrderCancellation(Order order, User user, String reason) {
+        try {
+            AdminNotification notification = new AdminNotification();
+            notification.setTitle("Order Cancelled");
+            notification.setMessage(String.format(
+                "Order #%d cancelled by %s (%s). Reason: %s. Amount: ₹%.2f",
+                order.getId(),
+                getCustomerName(user),
+                user.getMobileNumber(),
+                reason != null ? reason : "No reason provided",
+                order.getTotalAmount()
+            ));
+            notification.setType("ORDER_CANCELLED");
+            notification.setOrderId(order.getId());
+            notification.setCustomerName(getCustomerName(user));
+            notification.setCustomerMobile(user.getMobileNumber());
+            
+            notificationRepository.save(notification);
+            
+            // Log to console
+            logger.info("🔔 ADMIN NOTIFICATION: {}", notification.getMessage());
+            
+            // Send email notification
+            emailNotificationService.sendOrderCancellationEmail(
+                notification.getCustomerName(),
+                notification.getCustomerMobile(),
+                notification.getOrderId(),
+                order.getTotalAmount().toString(),
+                reason
+            );
+            
+        } catch (Exception e) {
+            logger.error("Failed to create cancellation notification for order {}", order.getId(), e);
+        }
+    }
+    
     private String getCustomerName(User customer) {
         if (customer.getFirstName() != null && customer.getLastName() != null) {
             return customer.getFirstName() + " " + customer.getLastName();

@@ -46,6 +46,22 @@ public class OrderController {
         return orderService.getAllOrders(pageable).map(orderService::convertToDto);
     }
 
+    // Cancel order (user can cancel their own orders)
+    @PostMapping("/{orderId}/cancel")
+    public org.springframework.http.ResponseEntity<com.example.handPick.dto.OrderDto> cancelOrder(
+            @PathVariable Long orderId,
+            @RequestBody com.example.handPick.dto.OrderCancellationDto cancellationDto,
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        try {
+            Order cancelledOrder = orderService.cancelOrder(orderId, userDetails.getUsername(), cancellationDto.getReason());
+            return org.springframework.http.ResponseEntity.ok(orderService.convertToDto(cancelledOrder));
+        } catch (RuntimeException e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(null);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.internalServerError().body(null);
+        }
+    }
+
     // Get a single order (detail view)
     @GetMapping("/{orderId}")
     public org.springframework.http.ResponseEntity<com.example.handPick.dto.OrderDto> getOrderDetail(
@@ -195,4 +211,5 @@ public class OrderController {
         com.example.handPick.model.Order updatedOrder = orderService.updateOrderStatus(orderId, statusUpdateDto.getStatus());
         return org.springframework.http.ResponseEntity.ok(orderService.convertToDto(updatedOrder));
     }
+    
 }

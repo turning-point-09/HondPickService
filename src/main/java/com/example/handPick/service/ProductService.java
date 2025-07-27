@@ -235,4 +235,18 @@ public class ProductService {
         
         return Math.max(0, product.getStockQuantity() - totalInCarts);
     }
+    
+    /**
+     * Restore stock for a product (used when order is cancelled)
+     */
+    @Transactional
+    public void restoreStock(Long productId, int quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        
+        if (product.getStockQuantity() != null) {
+            product.setStockQuantity(product.getStockQuantity() + quantity);
+            productRepository.save(product);
+        }
+    }
 }
