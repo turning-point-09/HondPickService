@@ -43,6 +43,7 @@ public class CartService {
     private final ProductService productService;
     private final UserService userService;
     private final UserAddressService userAddressService;
+    private final NotificationService notificationService;
 
     @Value("${app.gst.rate:0.18}")
     private double gstRate;
@@ -54,7 +55,8 @@ public class CartService {
                        OrderItemRepository orderItemRepository,
                        ProductService productService,
                        UserService userService,
-                       UserAddressService userAddressService) {
+                       UserAddressService userAddressService,
+                       NotificationService notificationService) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.orderRepository = orderRepository;
@@ -62,6 +64,7 @@ public class CartService {
         this.productService = productService;
         this.userService = userService;
         this.userAddressService = userAddressService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -106,10 +109,19 @@ public class CartService {
         int newTotal = currentQty + addQty;
 
         // Check for sufficient stock before adding
-        if (product.getStockQuantity() != null && product.getStockQuantity() < newTotal) {
+        int availableStock = getAvailableStock(product);
+        int totalInCart = cart.getItems().stream()
+                .filter(i -> i.getProduct().getId().equals(product.getId()))
+                .mapToInt(CartItem::getQuantity)
+                .sum();
+        
+        int totalRequested = totalInCart + addQty;
+        
+        if (availableStock < totalRequested) {
             throw new IllegalArgumentException(
-                    "Insufficient stock. Available: " +
-                            product.getStockQuantity() + ", requested: " + newTotal);
+                    "Insufficient stock. Available: " + availableStock + 
+                    ", requested: " + totalRequested + 
+                    " (already in cart: " + totalInCart + ")");
         }
 
         if (existing.isPresent()) {
@@ -125,11 +137,7 @@ public class CartService {
             cartItemRepository.save(item);
         }
 
-        // Deduct stock from the product
-        if (product.getStockQuantity() != null) {
-            product.setStockQuantity(product.getStockQuantity() - addQty);
-            productService.saveProductEntity(product);
-        }
+        // DO NOT deduct stock here - stock is only deducted during checkout
 
         cartRepository.save(cart);
         return convertToDto(cart);
@@ -160,30 +168,51 @@ public class CartService {
         if (quantity <= 0) {
             cart.getItems().remove(item);
             cartItemRepository.delete(item);
-            if (product.getStockQuantity() != null) {
-                product.setStockQuantity(product.getStockQuantity() + oldQty);
-                productService.saveProductEntity(product);
-            }
+            // DO NOT add stock back here - stock is only managed during checkout
         } else {
-            if (diff > 0
-                    && product.getStockQuantity() != null
-                    && product.getStockQuantity() < diff) {
+            // Check if new quantity exceeds available stock
+            int availableStock = getAvailableStock(product);
+            int totalInCart = cart.getItems().stream()
+                    .filter(i -> i.getProduct().getId().equals(productId))
+                    .mapToInt(CartItem::getQuantity)
+                    .sum();
+            
+            int otherItemsInCart = totalInCart - oldQty; // Items of same product in cart, excluding current item
+            int totalRequested = otherItemsInCart + quantity;
+            
+            if (availableStock < totalRequested) {
                 throw new IllegalArgumentException(
-                        "Insufficient stock. Only " +
-                                product.getStockQuantity() +
-                                " more units available.");
+                        "Insufficient stock. Available: " + availableStock + 
+                        ", requested: " + totalRequested + 
+                        " (other items in cart: " + otherItemsInCart + ")");
             }
+            
             item.setQuantity(quantity);
             item.setPrice(product.getPrice());
             cartItemRepository.save(item);
-            if (product.getStockQuantity() != null) {
-                product.setStockQuantity(product.getStockQuantity() - diff);
-                productService.saveProductEntity(product);
-            }
+            // DO NOT deduct stock here - stock is only deducted during checkout
         }
 
         cartRepository.save(cart);
         return convertToDto(cart);
+    }
+
+    /**
+     * Calculates available stock for a product considering items in active carts
+     */
+    private int getAvailableStock(Product product) {
+        if (product.getStockQuantity() == null) {
+            return 0;
+        }
+        
+        // Get total quantity of this product in all active carts
+        int totalInCarts = cartItemRepository.findAll().stream()
+                .filter(item -> item.getProduct().getId().equals(product.getId()))
+                .filter(item -> item.getCart().getStatus() == Cart.CartStatus.ACTIVE)
+                .mapToInt(CartItem::getQuantity)
+                .sum();
+        
+        return product.getStockQuantity() - totalInCarts;
     }
 
     /**
@@ -206,11 +235,7 @@ public class CartService {
         cart.getItems().remove(item);
         cartItemRepository.delete(item);
 
-        if (product.getStockQuantity() != null) {
-            product.setStockQuantity(
-                    product.getStockQuantity() + item.getQuantity());
-            productService.saveProductEntity(product);
-        }
+        // DO NOT add stock back here - stock is only managed during checkout
 
         cartRepository.save(cart);
         return convertToDto(cart);
@@ -300,6 +325,10 @@ public class CartService {
         activeCart.setStatus(Cart.CartStatus.ORDERED);
         activeCart.setUser(userForOrder);
         cartRepository.save(activeCart);
+        
+        // Notify admin about new order
+        notificationService.notifyNewOrder(order, userForOrder);
+        
         return order;
     }
 

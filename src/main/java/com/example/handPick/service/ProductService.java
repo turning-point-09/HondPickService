@@ -14,15 +14,20 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import com.example.handPick.model.Cart;
+import com.example.handPick.model.CartItem;
+import com.example.handPick.repository.CartItemRepository;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final CartItemRepository cartItemRepository;
 
     @Autowired
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, CartItemRepository cartItemRepository) {
         this.productRepository = productRepository;
+        this.cartItemRepository = cartItemRepository;
     }
 
     /**
@@ -208,5 +213,26 @@ public class ProductService {
     public Page<ProductDto> searchProducts(String searchTerm, Pageable pageable) {
         return productRepository.searchByNameOrDescription(searchTerm, pageable)
                 .map(this::convertToDto);
+    }
+
+    /**
+     * Get available stock for a product (considering items in active carts)
+     */
+    public int getAvailableStock(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        
+        if (product.getStockQuantity() == null) {
+            return 0;
+        }
+        
+        // Get total quantity of this product in all active carts
+        int totalInCarts = cartItemRepository.findAll().stream()
+                .filter(item -> item.getProduct().getId().equals(productId))
+                .filter(item -> item.getCart().getStatus() == Cart.CartStatus.ACTIVE)
+                .mapToInt(CartItem::getQuantity)
+                .sum();
+        
+        return Math.max(0, product.getStockQuantity() - totalInCarts);
     }
 }

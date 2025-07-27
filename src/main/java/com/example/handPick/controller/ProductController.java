@@ -119,6 +119,20 @@ public class ProductController {
     }
 
     /**
+     * GET /api/products/{id}/available-stock
+     * Get available stock for a product (considering items in carts)
+     */
+    @GetMapping("/{id}/available-stock")
+    public ResponseEntity<Integer> getAvailableStock(@PathVariable Long id) {
+        try {
+            int availableStock = productService.getAvailableStock(id);
+            return ResponseEntity.ok(availableStock);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(0);
+        }
+    }
+
+    /**
      * POST /api/v1/products
      * Create a new product (admin only).
      */

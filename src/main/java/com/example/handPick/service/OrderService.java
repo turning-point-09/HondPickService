@@ -21,6 +21,9 @@ public class OrderService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     // Get paginated order history for a user
     public Page<Order> getOrdersForUser(String mobileNumber, Pageable pageable) {
@@ -75,8 +78,14 @@ public class OrderService {
         
         try {
             Order.OrderStatus newStatus = Order.OrderStatus.valueOf(status.toUpperCase());
+            String oldStatus = order.getStatus().name();
             order.setStatus(newStatus);
-            return orderRepository.save(order);
+            Order savedOrder = orderRepository.save(order);
+            
+            // Notify admin about status change
+            notificationService.notifyOrderStatusChange(savedOrder, oldStatus, newStatus.name());
+            
+            return savedOrder;
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Invalid order status: " + status);
         }

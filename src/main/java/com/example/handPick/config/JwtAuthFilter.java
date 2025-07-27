@@ -41,32 +41,52 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String jwtToken = null;
         String mobileNumber = null;
 
-        // 1. Try to extract JWT from "jwt_token" cookie
-        Optional<Cookie> jwtCookie = Arrays.stream(Optional.ofNullable(request.getCookies()).orElse(new Cookie[0]))
-                .filter(cookie -> "jwt_token".equals(cookie.getName()))
-                .findFirst();
-
-        if (jwtCookie.isPresent()) {
-            jwtToken = jwtCookie.get().getValue();
+        // 1. Try to extract JWT from Authorization header first
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwtToken = authHeader.substring(7); // Remove "Bearer " prefix
             try {
                 mobileNumber = jwtUtil.extractMobileNumber(jwtToken);
-                logger.debug("JWT Token found in cookie. Extracted mobile number: {}", mobileNumber);
+                logger.debug("JWT Token found in Authorization header. Extracted mobile number: {}", mobileNumber);
             } catch (ExpiredJwtException e) {
                 logger.warn("JWT Token is expired: {}", e.getMessage());
-                clearCookie(response, "jwt_token", "/");
             } catch (SignatureException e) {
                 logger.warn("JWT Token has invalid signature: {}", e.getMessage());
-                clearCookie(response, "jwt_token", "/");
             } catch (MalformedJwtException e) {
                 logger.warn("JWT Token is malformed: {}", e.getMessage());
-                clearCookie(response, "jwt_token", "/");
             } catch (IllegalArgumentException e) {
                 logger.warn("Unable to get JWT Token or JWT claims string is empty: {}", e.getMessage());
             } catch (Exception e) {
                 logger.error("An unexpected error occurred during JWT token processing: {}", e.getMessage(), e);
             }
         } else {
-            logger.debug("No 'jwt_token' cookie found in request.");
+            // 2. Try to extract JWT from "jwt_token" cookie as fallback
+            Optional<Cookie> jwtCookie = Arrays.stream(Optional.ofNullable(request.getCookies()).orElse(new Cookie[0]))
+                    .filter(cookie -> "jwt_token".equals(cookie.getName()))
+                    .findFirst();
+
+            if (jwtCookie.isPresent()) {
+                jwtToken = jwtCookie.get().getValue();
+                try {
+                    mobileNumber = jwtUtil.extractMobileNumber(jwtToken);
+                    logger.debug("JWT Token found in cookie. Extracted mobile number: {}", mobileNumber);
+                } catch (ExpiredJwtException e) {
+                    logger.warn("JWT Token is expired: {}", e.getMessage());
+                    clearCookie(response, "jwt_token", "/");
+                } catch (SignatureException e) {
+                    logger.warn("JWT Token has invalid signature: {}", e.getMessage());
+                    clearCookie(response, "jwt_token", "/");
+                } catch (MalformedJwtException e) {
+                    logger.warn("JWT Token is malformed: {}", e.getMessage());
+                    clearCookie(response, "jwt_token", "/");
+                } catch (IllegalArgumentException e) {
+                    logger.warn("Unable to get JWT Token or JWT claims string is empty: {}", e.getMessage());
+                } catch (Exception e) {
+                    logger.error("An unexpected error occurred during JWT token processing: {}", e.getMessage(), e);
+                }
+            } else {
+                logger.debug("No JWT token found in Authorization header or cookies.");
+            }
         }
 
         // 2. If mobileNumber is extracted and no authentication is currently set in SecurityContext
