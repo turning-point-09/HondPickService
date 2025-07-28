@@ -18,6 +18,44 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // Add this paginated method for the service
     Page<Order> findByUser(User user, Pageable pageable);
     
+    // Filter orders by user and date range
+    @Query("SELECT o FROM Order o WHERE o.user = :user AND o.orderDate >= :startDate AND o.orderDate <= :endDate")
+    Page<Order> findByUserAndOrderDateBetween(@Param("user") User user, 
+                                             @Param("startDate") LocalDateTime startDate, 
+                                             @Param("endDate") LocalDateTime endDate, 
+                                             Pageable pageable);
+    
+    // Filter orders by user and status
+    @Query("SELECT o FROM Order o WHERE o.user = :user AND o.status = :status")
+    Page<Order> findByUserAndStatus(@Param("user") User user, 
+                                   @Param("status") Order.OrderStatus status, 
+                                   Pageable pageable);
+    
+    // Filter orders by user, status and date range
+    @Query("SELECT o FROM Order o WHERE o.user = :user AND o.status = :status AND o.orderDate >= :startDate AND o.orderDate <= :endDate")
+    Page<Order> findByUserAndStatusAndOrderDateBetween(@Param("user") User user, 
+                                                      @Param("status") Order.OrderStatus status,
+                                                      @Param("startDate") LocalDateTime startDate, 
+                                                      @Param("endDate") LocalDateTime endDate, 
+                                                      Pageable pageable);
+    
+    // Admin: Filter all orders by date range
+    @Query("SELECT o FROM Order o WHERE o.orderDate >= :startDate AND o.orderDate <= :endDate")
+    Page<Order> findByOrderDateBetween(@Param("startDate") LocalDateTime startDate, 
+                                      @Param("endDate") LocalDateTime endDate, 
+                                      Pageable pageable);
+    
+    // Admin: Filter all orders by status
+    @Query("SELECT o FROM Order o WHERE o.status = :status")
+    Page<Order> findByStatus(@Param("status") Order.OrderStatus status, Pageable pageable);
+    
+    // Admin: Filter all orders by status and date range
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.orderDate >= :startDate AND o.orderDate <= :endDate")
+    Page<Order> findByStatusAndOrderDateBetween(@Param("status") Order.OrderStatus status,
+                                               @Param("startDate") LocalDateTime startDate, 
+                                               @Param("endDate") LocalDateTime endDate, 
+                                               Pageable pageable);
+    
     // Calculate monthly revenue from delivered orders
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = 'DELIVERED' AND o.orderDate >= :startDate AND o.orderDate < :endDate")
     BigDecimal calculateMonthlyRevenue(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);

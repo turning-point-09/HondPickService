@@ -16,12 +16,158 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 @RestController
 @RequestMapping("/api/v1/orders")
 public class OrderController {
 
     @Autowired
     private OrderService orderService;
+
+    // Test endpoint to demonstrate sorting features
+    @GetMapping("/sort-examples")
+    public ResponseEntity<java.util.Map<String, Object>> getSortExamples() {
+        java.util.Map<String, Object> examples = new java.util.HashMap<>();
+        
+        // Single field sorting examples
+        java.util.List<String> singleFieldExamples = java.util.Arrays.asList(
+            "GET /api/v1/orders/filtered?sortBy=orderDate&sortDirection=asc",
+            "GET /api/v1/orders/filtered?sortBy=totalAmount&sortDirection=desc",
+            "GET /api/v1/orders/filtered?sortBy=status&sortDirection=asc",
+            "GET /api/v1/orders/filtered?sortBy=paymentMethod&sortDirection=desc",
+            "GET /api/v1/orders/filtered?sortBy=id&sortDirection=desc"
+        );
+        examples.put("singleFieldExamples", singleFieldExamples);
+        
+        // Multiple field sorting examples
+        java.util.List<String> multiFieldExamples = java.util.Arrays.asList(
+            "GET /api/v1/orders/filtered?sortBy=orderDate:desc,totalAmount:asc",
+            "GET /api/v1/orders/filtered?sortBy=status:asc,orderDate:desc",
+            "GET /api/v1/orders/filtered?sortBy=paymentMethod:desc,id:asc",
+            "GET /api/v1/orders/filtered?sortBy=totalAmount:desc,orderDate:desc,status:asc"
+        );
+        examples.put("multiFieldExamples", multiFieldExamples);
+        
+        // JSON body examples
+        java.util.Map<String, Object> jsonExamples = new java.util.HashMap<>();
+        
+        java.util.Map<String, Object> example1 = new java.util.HashMap<>();
+        example1.put("description", "Sort by order date ascending");
+        example1.put("request", java.util.Map.of(
+            "sortBy", "orderDate",
+            "sortDirection", "asc",
+            "page", 0,
+            "size", 10
+        ));
+        
+        java.util.Map<String, Object> example2 = new java.util.HashMap<>();
+        example2.put("description", "Multiple field sorting with individual directions");
+        example2.put("request", java.util.Map.of(
+            "sortFields", "orderDate:desc,totalAmount:asc,status:asc",
+            "page", 0,
+            "size", 20
+        ));
+        
+        java.util.Map<String, Object> example3 = new java.util.HashMap<>();
+        example3.put("description", "Filter by status and sort by amount");
+        example3.put("request", java.util.Map.of(
+            "status", "PENDING",
+            "sortBy", "totalAmount",
+            "sortDirection", "desc",
+            "startDate", "2024-01-01",
+            "endDate", "2024-01-31"
+        ));
+        
+        jsonExamples.put("example1", example1);
+        jsonExamples.put("example2", example2);
+        jsonExamples.put("example3", example3);
+        examples.put("jsonExamples", jsonExamples);
+        
+        // Field aliases
+        java.util.Map<String, String> fieldAliases = new java.util.HashMap<>();
+        fieldAliases.put("date", "orderDate");
+        fieldAliases.put("amount", "totalAmount");
+        fieldAliases.put("price", "totalAmount");
+        fieldAliases.put("total", "totalAmount");
+        fieldAliases.put("method", "paymentMethod");
+        fieldAliases.put("paid", "paymentStatus");
+        fieldAliases.put("orderid", "id");
+        fieldAliases.put("txn", "transactionId");
+        fieldAliases.put("comments", "feedbackComments");
+        fieldAliases.put("ontime", "feedbackOnTime");
+        fieldAliases.put("customer", "user.firstName");
+        fieldAliases.put("mobile", "user.mobileNumber");
+        fieldAliases.put("phone", "user.mobileNumber");
+        fieldAliases.put("city", "shippingAddress.city");
+        fieldAliases.put("state", "shippingAddress.state");
+        fieldAliases.put("zip", "shippingAddress.postalCode");
+        examples.put("fieldAliases", fieldAliases);
+        
+        return ResponseEntity.ok(examples);
+    }
+
+    // Get available sorting options
+    @GetMapping("/sort-options")
+    public ResponseEntity<java.util.Map<String, Object>> getSortOptions() {
+        java.util.Map<String, Object> sortOptions = new java.util.HashMap<>();
+        
+        // Basic order fields
+        java.util.Map<String, String> orderFields = new java.util.HashMap<>();
+        orderFields.put("orderDate", "Order Date");
+        orderFields.put("totalAmount", "Total Amount");
+        orderFields.put("status", "Order Status");
+        orderFields.put("paymentMethod", "Payment Method");
+        orderFields.put("paymentStatus", "Payment Status");
+        orderFields.put("id", "Order ID");
+        orderFields.put("transactionId", "Transaction ID");
+        orderFields.put("feedbackComments", "Feedback Comments");
+        orderFields.put("feedbackOnTime", "Feedback On Time");
+        
+        // User fields (for admin)
+        java.util.Map<String, String> userFields = new java.util.HashMap<>();
+        userFields.put("user.id", "User ID");
+        userFields.put("user.firstName", "Customer Name");
+        userFields.put("user.mobileNumber", "Mobile Number");
+        
+        // Shipping address fields
+        java.util.Map<String, String> addressFields = new java.util.HashMap<>();
+        addressFields.put("shippingAddress.city", "City");
+        addressFields.put("shippingAddress.state", "State");
+        addressFields.put("shippingAddress.postalCode", "Postal Code");
+        
+        sortOptions.put("orderFields", orderFields);
+        sortOptions.put("userFields", userFields);
+        sortOptions.put("addressFields", addressFields);
+        
+        // Sort directions
+        java.util.List<String> sortDirections = java.util.Arrays.asList("asc", "desc");
+        sortOptions.put("sortDirections", sortDirections);
+        
+        // Aliases for common fields
+        java.util.Map<String, String> aliases = new java.util.HashMap<>();
+        aliases.put("date", "orderDate");
+        aliases.put("amount", "totalAmount");
+        aliases.put("price", "totalAmount");
+        aliases.put("total", "totalAmount");
+        aliases.put("method", "paymentMethod");
+        aliases.put("paid", "paymentStatus");
+        aliases.put("orderid", "id");
+        aliases.put("txn", "transactionId");
+        aliases.put("comments", "feedbackComments");
+        aliases.put("ontime", "feedbackOnTime");
+        aliases.put("customer", "user.firstName");
+        aliases.put("mobile", "user.mobileNumber");
+        aliases.put("phone", "user.mobileNumber");
+        aliases.put("city", "shippingAddress.city");
+        aliases.put("state", "shippingAddress.state");
+        aliases.put("zip", "shippingAddress.postalCode");
+        
+        sortOptions.put("aliases", aliases);
+        
+        return ResponseEntity.ok(sortOptions);
+    }
 
     // Paginated order history for the logged-in user
     @GetMapping
@@ -35,6 +181,97 @@ public class OrderController {
                 .map(orderService::convertToDto);
     }
 
+    // Enhanced order history with filtering, sorting, and date range
+    @GetMapping("/filtered")
+    public Page<com.example.handPick.dto.OrderDto> getFilteredOrderHistory(
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            startDateTime = LocalDateTime.parse(startDate + "T00:00:00", DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+        
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            endDateTime = LocalDateTime.parse(endDate + "T23:59:59", DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+        
+        return orderService.getOrdersForUserWithFilters(
+                userDetails.getUsername(), 
+                status, 
+                startDateTime, 
+                endDateTime, 
+                sortBy, 
+                sortDirection, 
+                pageable
+        ).map(orderService::convertToDto);
+    }
+
+    // Enhanced order history with JSON filter request
+    @PostMapping("/filtered")
+    public Page<com.example.handPick.dto.OrderDto> getFilteredOrderHistoryWithBody(
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails,
+            @RequestBody com.example.handPick.dto.OrderFilterRequest filterRequest
+    ) {
+        Pageable pageable = PageRequest.of(
+                filterRequest.getPage() != null ? filterRequest.getPage() : 0,
+                filterRequest.getSize() != null ? filterRequest.getSize() : 10
+        );
+        
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (filterRequest.getStartDate() != null) {
+            startDateTime = filterRequest.getStartDate().atStartOfDay();
+        }
+        
+        if (filterRequest.getEndDate() != null) {
+            endDateTime = filterRequest.getEndDate().atTime(23, 59, 59);
+        }
+        
+        return orderService.getOrdersForUserWithFilters(
+                userDetails.getUsername(), 
+                filterRequest.getStatus(), 
+                startDateTime, 
+                endDateTime, 
+                filterRequest.getEffectiveSortFields(), 
+                filterRequest.getSortDirection(), 
+                pageable
+        ).map(orderService::convertToDto);
+    }
+
+    // Get orders filtered by month
+    @GetMapping("/month")
+    public Page<com.example.handPick.dto.OrderDto> getOrdersByMonth(
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        return orderService.getOrdersForUserByMonth(
+                userDetails.getUsername(), 
+                year, 
+                month, 
+                sortBy, 
+                sortDirection, 
+                pageable
+        ).map(orderService::convertToDto);
+    }
+
     // Admin: Get all orders (paged)
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
@@ -44,6 +281,94 @@ public class OrderController {
     ) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
         return orderService.getAllOrders(pageable).map(orderService::convertToDto);
+    }
+
+    // Admin: Enhanced order management with filtering, sorting, and date range
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/filtered")
+    public Page<com.example.handPick.dto.OrderDto> getFilteredOrdersForAdmin(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            startDateTime = LocalDateTime.parse(startDate + "T00:00:00", DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+        
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            endDateTime = LocalDateTime.parse(endDate + "T23:59:59", DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+        
+        return orderService.getAllOrdersWithFilters(
+                status, 
+                startDateTime, 
+                endDateTime, 
+                sortBy, 
+                sortDirection, 
+                pageable
+        ).map(orderService::convertToDto);
+    }
+
+    // Admin: Enhanced order management with JSON filter request
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/admin/filtered")
+    public Page<com.example.handPick.dto.OrderDto> getFilteredOrdersForAdminWithBody(
+            @RequestBody com.example.handPick.dto.OrderFilterRequest filterRequest
+    ) {
+        Pageable pageable = PageRequest.of(
+                filterRequest.getPage() != null ? filterRequest.getPage() : 0,
+                filterRequest.getSize() != null ? filterRequest.getSize() : 10
+        );
+        
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (filterRequest.getStartDate() != null) {
+            startDateTime = filterRequest.getStartDate().atStartOfDay();
+        }
+        
+        if (filterRequest.getEndDate() != null) {
+            endDateTime = filterRequest.getEndDate().atTime(23, 59, 59);
+        }
+        
+        return orderService.getAllOrdersWithFilters(
+                filterRequest.getStatus(), 
+                startDateTime, 
+                endDateTime, 
+                filterRequest.getEffectiveSortFields(), 
+                filterRequest.getSortDirection(), 
+                pageable
+        ).map(orderService::convertToDto);
+    }
+
+    // Admin: Get orders filtered by month
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/month")
+    public Page<com.example.handPick.dto.OrderDto> getAdminOrdersByMonth(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        return orderService.getAllOrdersByMonth(
+                year, 
+                month, 
+                sortBy, 
+                sortDirection, 
+                pageable
+        ).map(orderService::convertToDto);
     }
 
     // Cancel order (user can cancel their own orders)
