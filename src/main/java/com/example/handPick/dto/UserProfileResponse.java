@@ -9,6 +9,7 @@ public class UserProfileResponse {
     private String role;
     private String mobileNumber;
 
+
     public UserProfileResponse(Long id, String username, String firstName, String lastName, String email, String role, String mobileNumber) {
         this.id = id;
         this.username = username;
