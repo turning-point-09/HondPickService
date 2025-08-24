@@ -27,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,9 @@ import java.util.Optional;
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+    
+    @Value("${app.cookies.secure:false}")
+    private boolean cookiesSecure;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -66,7 +70,7 @@ public class AuthController {
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setPath("/");
         accessTokenCookie.setMaxAge((int) (accessTokenMaxAgeMs / 1000));
-        accessTokenCookie.setSecure(true); // Only over HTTPS in production
+        accessTokenCookie.setSecure(cookiesSecure); // Use configuration property
         // Optionally set SameSite if supported by your Servlet container
         // accessTokenCookie.setAttribute("SameSite", "Strict");
         response.addCookie(accessTokenCookie);
@@ -75,7 +79,7 @@ public class AuthController {
         refreshTokenCookie.setHttpOnly(true);
         refreshTokenCookie.setPath("/api/auth/refresh");
         refreshTokenCookie.setMaxAge(refreshTokenMaxAgeSeconds);
-        refreshTokenCookie.setSecure(true); // Only over HTTPS in production
+        refreshTokenCookie.setSecure(cookiesSecure); // Use configuration property
         // refreshTokenCookie.setAttribute("SameSite", "Strict");
         response.addCookie(refreshTokenCookie);
 
@@ -212,7 +216,7 @@ public class AuthController {
         accessTokenCookie.setPath("/");
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setMaxAge(0);
-        accessTokenCookie.setSecure(true);
+        accessTokenCookie.setSecure(cookiesSecure);
         // accessTokenCookie.setAttribute("SameSite", "Strict");
         httpResponse.addCookie(accessTokenCookie);
 
@@ -220,7 +224,7 @@ public class AuthController {
         refreshTokenCookie.setPath("/api/auth/refresh");
         refreshTokenCookie.setHttpOnly(true);
         refreshTokenCookie.setMaxAge(0);
-        refreshTokenCookie.setSecure(true);
+        refreshTokenCookie.setSecure(cookiesSecure);
         // refreshTokenCookie.setAttribute("SameSite", "Strict");
         httpResponse.addCookie(refreshTokenCookie);
 

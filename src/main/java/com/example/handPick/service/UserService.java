@@ -350,4 +350,75 @@ public class UserService {
         
         return stats;
     }
+
+    /**
+     * Updates the profile information for a user.
+     * @param userId The ID of the user to update.
+     * @param updateDto The DTO containing the updated profile information.
+     * @return The updated User entity.
+     * @throws RuntimeException if user not found or validation fails.
+     */
+    @Transactional
+    public User updateUserProfile(Long userId, com.example.handPick.dto.UserUpdateDto updateDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        // Update first name if provided
+        if (updateDto.getFirstName() != null && !updateDto.getFirstName().trim().isEmpty()) {
+            user.setFirstName(updateDto.getFirstName().trim());
+        }
+
+        // Update last name if provided
+        if (updateDto.getLastName() != null && !updateDto.getLastName().trim().isEmpty()) {
+            user.setLastName(updateDto.getLastName().trim());
+        }
+
+        // Update email if provided (check uniqueness)
+        if (updateDto.getEmail() != null && !updateDto.getEmail().trim().isEmpty()) {
+            String newEmail = updateDto.getEmail().trim();
+            if (!newEmail.equals(user.getEmail())) {
+                if (userRepository.existsByEmail(newEmail)) {
+                    throw new RuntimeException("Email already exists: " + newEmail);
+                }
+                user.setEmail(newEmail);
+            }
+        }
+
+        // Update username if provided (check uniqueness)
+        if (updateDto.getUsername() != null && !updateDto.getUsername().trim().isEmpty()) {
+            String newUsername = updateDto.getUsername().trim();
+            if (!newUsername.equals(user.getUsername())) {
+                if (userRepository.existsByUsername(newUsername)) {
+                    throw new RuntimeException("Username already exists: " + newUsername);
+                }
+                user.setUsername(newUsername);
+            }
+        }
+
+        // Update mobile number if provided (check uniqueness)
+        if (updateDto.getMobileNumber() != null && !updateDto.getMobileNumber().trim().isEmpty()) {
+            String newMobileNumber = updateDto.getMobileNumber().trim();
+            if (!newMobileNumber.equals(user.getMobileNumber())) {
+                if (userRepository.existsByMobileNumber(newMobileNumber)) {
+                    throw new RuntimeException("Mobile number already exists: " + newMobileNumber);
+                }
+                user.setMobileNumber(newMobileNumber);
+            }
+        }
+
+        // Update password if provided (requires current password verification)
+        if (updateDto.getNewPassword() != null && !updateDto.getNewPassword().trim().isEmpty()) {
+            if (updateDto.getCurrentPassword() == null || updateDto.getCurrentPassword().trim().isEmpty()) {
+                throw new RuntimeException("Current password is required to change password");
+            }
+            
+            if (!passwordEncoder.matches(updateDto.getCurrentPassword(), user.getPassword())) {
+                throw new RuntimeException("Current password is incorrect");
+            }
+            
+            user.setPassword(passwordEncoder.encode(updateDto.getNewPassword()));
+        }
+
+        return userRepository.save(user);
+    }
 }

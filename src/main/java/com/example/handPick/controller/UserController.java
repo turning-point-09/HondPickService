@@ -17,6 +17,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/user")
 @CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
@@ -40,7 +42,7 @@ public class UserController {
         try {
             User currentUser = userService.findByMobileNumber(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found for authenticated principal."));
-            logger.info("Fetched user ID {} for user {}", currentUser.getId(), currentUser.getMobileNumber());
+            logger.info("Fetched user ID {} for user {}", currentUser, currentUser.getMobileNumber());
             return ResponseEntity.ok(currentUser.getId());
         } catch (Exception e) {
             logger.error("Error fetching user ID for {}: {}", userDetails.getUsername(), e.getMessage());
@@ -128,6 +130,8 @@ public class UserController {
                 .<ResponseEntity<?>>map(user -> ResponseEntity.ok(new UserProfileResponse(
                         user.getId(),
                         user.getUsername(),
+                        user.getFirstName(),
+                        user.getLastName(),
                         user.getEmail(),
                         user.getRole(),
                         user.getMobileNumber()
@@ -167,5 +171,36 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
         return ResponseEntity.ok(userService.convertToDto(user));
+    }
+
+    /**
+     * PUT /api/user/profile
+     * Update the profile information for the currently authenticated user.
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateCurrentUserProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody com.example.handPick.dto.UserUpdateDto updateDto) {
+        if (userDetails == null) {
+            logger.warn("Unauthorized access attempt to update profile: No user details.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        try {
+            User currentUser = userService.findByMobileNumber(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found for authenticated principal."));
+
+            User updatedUser = userService.updateUserProfile(currentUser.getId(), updateDto);
+            
+            logger.info("Profile updated successfully for user {}", currentUser.getMobileNumber());
+            return ResponseEntity.ok(userService.convertToDto(updatedUser));
+            
+        } catch (RuntimeException e) {
+            logger.error("Error updating user profile for {}: {}", userDetails.getUsername(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Unexpected error updating user profile for {}: {}", userDetails.getUsername(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal server error"));
+        }
     }
 }

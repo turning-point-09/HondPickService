@@ -84,9 +84,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 } catch (Exception e) {
                     logger.error("An unexpected error occurred during JWT token processing: {}", e.getMessage(), e);
                 }
-            } else {
-                logger.debug("No JWT token found in Authorization header or cookies.");
-            }
+                    } else {
+            logger.debug("No JWT token found in Authorization header or cookies.");
+            logger.debug("Request cookies: {}", request.getCookies() != null ? 
+                Arrays.stream(request.getCookies()).map(c -> c.getName() + "=" + c.getValue()).collect(java.util.stream.Collectors.joining(", ")) : "null");
+            logger.debug("Authorization header: {}", authHeader);
+        }
         }
 
         // 2. If mobileNumber is extracted and no authentication is currently set in SecurityContext

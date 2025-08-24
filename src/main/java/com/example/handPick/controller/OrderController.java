@@ -6,6 +6,8 @@ import com.example.handPick.service.OrderService;
 import com.lowagie.text.Document;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.Paragraph;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -413,7 +415,7 @@ public class OrderController {
         com.lowagie.text.Font headerFont = new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 12, com.lowagie.text.Font.BOLD);
         com.lowagie.text.Font normalFont = new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 10, com.lowagie.text.Font.NORMAL);
         
-        Paragraph companyTitle = new Paragraph("HondPick Service", titleFont);
+        Paragraph companyTitle = new Paragraph("HandPick Service", titleFont);
         companyTitle.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
         document.add(companyTitle);
         
@@ -508,7 +510,7 @@ public class OrderController {
         document.add(new Paragraph(" ")); // Spacing
         
         // Footer
-        Paragraph footer = new Paragraph("Thank you for choosing HondPick Service!", normalFont);
+        Paragraph footer = new Paragraph("Thank you for choosing HandPick Service!", normalFont);
         footer.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
         document.add(footer);
         
@@ -524,6 +526,22 @@ public class OrderController {
     ) {
         orderService.saveOrderFeedback(orderId, feedbackDto, userDetails.getUsername());
         return ResponseEntity.ok("Feedback submitted!");
+    }
+
+    // Test endpoint to verify JWT authentication
+    @GetMapping("/test-auth")
+    public ResponseEntity<?> testAuthentication(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails != null) {
+            return ResponseEntity.ok(Map.of(
+                "message", "Authentication successful!",
+                "user", userDetails.getUsername(),
+                "authorities", userDetails.getAuthorities().stream()
+                    .map(Object::toString)
+                    .collect(java.util.stream.Collectors.toList())
+            ));
+        } else {
+            return ResponseEntity.status(401).body(Map.of("message", "Not authenticated"));
+        }
     }
 
     // Admin: Update order status
